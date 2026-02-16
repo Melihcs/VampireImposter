@@ -1,5 +1,8 @@
 // GamesController.cs
 using Microsoft.AspNetCore.Mvc;
+using VampireImposter.Api.Application;
+using VampireImposter.Api.Application.DTO;
+using VampireImposter.Api.Application.Security;
 using Vampire.Api.Infrastructure;
 using Vampire.Api.Infrastructure.Auth;
 using VampireImposter.Api.Contracts;
@@ -12,13 +15,15 @@ namespace Vampire.Api.Controllers;
 [Route("api/games")]
 public sealed class GamesController : ControllerBase
 {
-    private const int DefaultMaxPlayers = 10;
-
     private readonly IGameStore _games;
+    private readonly IGamePasscodeService _passcodeService;
+    private readonly IGameOrchestrator _orchestrator;
 
-    public GamesController(IGameStore games)
+    public GamesController(IGameStore games, IGamePasscodeService passcodeService, IGameOrchestrator orchestrator)
     {
         _games = games;
+        _passcodeService = passcodeService;
+        _orchestrator = orchestrator;
     }
 
     // 1) Lobby list: list all joinable lobby games
@@ -55,7 +60,8 @@ public sealed class GamesController : ControllerBase
             HostPlayerId = g.HostPlayerId,
             PlayerCount = g.Players.Count,
             MaxPlayers = g.MaxPlayers,
-            IsJoinable = g.Status == GameStatus.Lobby && g.Players.Count < g.MaxPlayers
+            IsJoinable = g.Status == GameStatus.Lobby && g.Players.Count < g.MaxPlayers,
+            PasscodeRequired = g.PasscodeRequired
         })
             .ToList();
 
@@ -85,7 +91,16 @@ public sealed class GamesController : ControllerBase
     public IActionResult Create([FromBody] CreateGameRequest req)
     {
         var player = HttpContext.CurrentPlayer();
-        var game = new Game(Guid.NewGuid(), req.Name, player.Id, req.MaxPlayers, req.DiscussionTime, req.VotingTime);
+        var passcodeHash = _passcodeService.Hash(req.Passcode);
+        var game = new Game(
+            Guid.NewGuid(),
+            req.Name,
+            player.Id,
+            req.MaxPlayers,
+            req.DiscussionTime,
+            req.VotingTime,
+            passcodeHash);
+
         game.AddPlayer(player.Id, player.Name);
         _games.Upsert(game);
         return CreatedAtAction(nameof(Get), new { gameId = game.Id }, ToDto(game));
@@ -95,32 +110,34 @@ public sealed class GamesController : ControllerBase
     // POST /api/games/{gameId}/join
     [HttpPost("{gameId:guid}/join")]
     [RequirePlayer]
-    [RequireGame]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(GameDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public IActionResult Join([FromRoute] Guid gameId)
+    public async Task<IActionResult> Join([FromRoute] Guid gameId, [FromBody] JoinGameRequest req, CancellationToken ct)
     {
         var player = HttpContext.CurrentPlayer();
-        var game = HttpContext.CurrentGame();
-        if (game.Status != GameStatus.Lobby)
-            return Conflict(new { error = "Game is not joinable (not in Lobby state)." });
+        var result = await _orchestrator.JoinLobbyAsync(
+            new JoinLobbyCommand(gameId, player.Id, player.Name, req.Passcode),
+            ct);
 
-        if (game.Players.Any(p => p.Id == player.Id))
-            return Ok(ToDto(game)); // idempotent
-
-        try
+        return result.Status switch
         {
-            game.AddPlayer(player.Id, player.Name);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Conflict(new { error = ex.Message });
-        }
-
-        _games.Upsert(game);
-        return Ok(ToDto(game));
+            JoinLobbyStatus.Success when result.Game is not null => Ok(ToDto(result.Game)),
+            JoinLobbyStatus.NotFound => NotFound(),
+            JoinLobbyStatus.InvalidPasscode => Problem(
+                title: "Invalid passcode",
+                detail: "Passcode does not match this game.",
+                statusCode: StatusCodes.Status403Forbidden),
+            JoinLobbyStatus.NotJoinable => Conflict(new { error = "Game is not joinable (not in Lobby state)." }),
+            JoinLobbyStatus.Conflict => Conflict(new { error = result.Error ?? "Unable to join this game." }),
+            _ => Problem(
+                title: "Join failed",
+                detail: "Unexpected join outcome.",
+                statusCode: StatusCodes.Status500InternalServerError)
+        };
     }
 
     // 3) Leave a game (remove player from token)
@@ -163,6 +180,7 @@ public sealed class GamesController : ControllerBase
         MaxPlayers = g.MaxPlayers,
         DiscussionTime = g.DiscussionTime,
         VotingTime = g.VotingTime,
-        IsJoinable = g.Status == GameStatus.Lobby && g.Players.Count < g.MaxPlayers
+        IsJoinable = g.Status == GameStatus.Lobby && g.Players.Count < g.MaxPlayers,
+        PasscodeRequired = g.PasscodeRequired
     };
 }

@@ -26,6 +26,8 @@ public sealed class Game
     public int MaxPlayers { get; }
     public int DiscussionTime { get; }
     public int VotingTime { get; }
+    public string PasscodeHash { get; }
+    public bool PasscodeRequired => !string.IsNullOrWhiteSpace(PasscodeHash);
     public DateTimeOffset CreatedAtUtc { get; }
     public DateTimeOffset? StartedAtUtc { get; private set; }
     public DateTimeOffset? FinishedAtUtc { get; private set; }
@@ -43,7 +45,8 @@ public sealed class Game
         Guid? hostPlayerId = null,
         int maxPlayers = DefaultMaxPlayers,
         int discussionTime = DefaultDiscussionTime,
-        int votingTime = DefaultVotingTime)
+        int votingTime = DefaultVotingTime,
+        string? passcodeHash = null)
     {
         if (id == Guid.Empty) throw new ArgumentException("Game id cannot be empty.", nameof(id));
 
@@ -53,6 +56,7 @@ public sealed class Game
         MaxPlayers = maxPlayers >= MinMaxPlayers ? maxPlayers : DefaultMaxPlayers;
         DiscussionTime = discussionTime > 0 ? discussionTime : DefaultDiscussionTime;
         VotingTime = votingTime > 0 ? votingTime : DefaultVotingTime;
+        PasscodeHash = passcodeHash?.Trim() ?? string.Empty;
         CreatedAtUtc = DateTimeOffset.UtcNow;
         Status = GameStatus.Lobby;
     }
@@ -77,6 +81,28 @@ public sealed class Game
             HostPlayerId = playerId;
 
         return player;
+    }
+
+    public GameJoinLobbyResult JoinLobby(Guid playerId, string playerName, bool isPasscodeValid)
+    {
+        if (PasscodeRequired && !isPasscodeValid)
+            return new GameJoinLobbyResult(GameJoinLobbyStatus.InvalidPasscode);
+
+        if (Status != GameStatus.Lobby)
+            return new GameJoinLobbyResult(GameJoinLobbyStatus.NotJoinable);
+
+        if (_players.Any(p => p.Id == playerId))
+            return new GameJoinLobbyResult(GameJoinLobbyStatus.Success);
+
+        try
+        {
+            AddPlayer(playerId, playerName);
+            return new GameJoinLobbyResult(GameJoinLobbyStatus.Success);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new GameJoinLobbyResult(GameJoinLobbyStatus.Conflict, ex.Message);
+        }
     }
 
     public void RemovePlayer(Guid playerId)

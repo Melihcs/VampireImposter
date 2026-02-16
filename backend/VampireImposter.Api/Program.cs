@@ -1,3 +1,5 @@
+using VampireImposter.Api.Application;
+using VampireImposter.Api.Application.Security;
 using VampireImposter.Storage;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,6 +10,13 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddSingleton<IPlayerStore, InMemoryPlayerStore>();
 builder.Services.AddSingleton<IGameStore, InMemoryGameStore>();
+builder.Services.AddSingleton<IGameOrchestrator, GameOrchestrator>();
+builder.Services
+    .AddOptions<PasscodeSecurityOptions>()
+    .Bind(builder.Configuration.GetSection(PasscodeSecurityOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+builder.Services.AddSingleton<IGamePasscodeService, Pbkdf2GamePasscodeService>();
 
 var app = builder.Build();
 

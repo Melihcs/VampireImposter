@@ -7,14 +7,28 @@ public sealed class CreateGameRequest
     [Required]
     [StringLength(60)]
     public required string Name { get; set; }
+
     [Range(2, 20)]
     public int MaxPlayers { get; set; } // optional
+
     [Required]
     [Range(1, int.MaxValue)]
     public int DiscussionTime { get; set; } // seconds
+
     [Required]
     [Range(1, int.MaxValue)]
     public int VotingTime { get; set; } // seconds
+
+    [Required]
+    [StringLength(64, MinimumLength = 4)]
+    public required string Passcode { get; set; }
+}
+
+public sealed class JoinGameRequest
+{
+    [Required]
+    [StringLength(64, MinimumLength = 4)]
+    public required string Passcode { get; set; }
 }
 
 public sealed class GameListItemDto
@@ -26,6 +40,7 @@ public sealed class GameListItemDto
     public int PlayerCount { get; set; }
     public int MaxPlayers { get; set; }
     public bool IsJoinable { get; set; }
+    public bool PasscodeRequired { get; set; }
 }
 
 public sealed class GameDto
@@ -41,4 +56,5 @@ public sealed class GameDto
     public int DiscussionTime { get; set; }
     public int VotingTime { get; set; }
     public bool IsJoinable { get; set; }
+    public bool PasscodeRequired { get; set; }
 }

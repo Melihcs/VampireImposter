@@ -33,6 +33,13 @@ Backend restore:
 dotnet restore VampireImposter.sln
 ```
 
+Backend secret setup (required for game passcode hashing):
+
+```bash
+cd backend/VampireImposter.Api
+dotnet user-secrets set "Security:PasscodePepper" "replace-with-a-long-random-secret"
+```
+
 Frontend install:
 
 ```bash
@@ -61,6 +68,11 @@ The frontend uses a Vite proxy so `/api` calls go to `https://localhost:5001`.
 ## API
 
 - `GET https://localhost:5001/api/players`
+
+## Passcode Secret In CI
+
+For GitHub Actions, add repository secret `SECURITY__PASSCODE_PEPPER`.
+The workflow reads it as environment variable `Security__PasscodePepper`.
 
 ## HTTPS Dev Cert (macOS)
 
