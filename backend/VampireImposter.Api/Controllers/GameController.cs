@@ -140,7 +140,41 @@ public sealed class GamesController : ControllerBase
         };
     }
 
-    // 3) Leave a game (remove player from token)
+    // 3) Start a game (host only)
+    // POST /api/games/{gameId}/start
+    [HttpPost("{gameId:guid}/start")]
+    [RequirePlayer]
+    [RequireGame]
+    [ProducesResponseType(typeof(GameDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public IActionResult Start([FromRoute] Guid gameId)
+    {
+        var player = HttpContext.CurrentPlayer();
+        var game = HttpContext.CurrentGame();
+
+        var result = game.StartGame(player.Id);
+
+        return result.Status switch
+        {
+            GameStartStatus.Success => StartSuccess(game),
+            GameStartStatus.HostOnly => Problem(
+                title: "Forbidden",
+                detail: result.Error ?? "Only the host can start the game.",
+                statusCode: StatusCodes.Status403Forbidden),
+            GameStartStatus.NotEnoughPlayers => Conflict(new { error = result.Error ?? "At least 3 players are required to start." }),
+            GameStartStatus.NotJoinable => Conflict(new { error = result.Error ?? "Game is not joinable." }),
+            GameStartStatus.Conflict => Conflict(new { error = result.Error ?? "Unable to start this game." }),
+            _ => Problem(
+                title: "Start failed",
+                detail: "Unexpected start outcome.",
+                statusCode: StatusCodes.Status500InternalServerError)
+        };
+    }
+
+    // 4) Leave a game (remove player from token)
     // DELETE /api/games/{gameId}/players/me
     [HttpDelete("{gameId:guid}/players/me")]
     [RequirePlayer]
@@ -166,6 +200,12 @@ public sealed class GamesController : ControllerBase
 
         _games.Upsert(game);
         return NoContent();
+    }
+
+    private IActionResult StartSuccess(Game game)
+    {
+        _games.Upsert(game);
+        return Ok(ToDto(game));
     }
 
     private static GameDto ToDto(Game g) => new()
