@@ -1,0 +1,707 @@
+{
+  "info": {
+    "_postman_id": "c6c5fb2d-92af-4f4e-a63b-6b8f16cbaf41",
+    "name": "VampireImposter API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Collection for currently implemented Player and Game endpoints. Requests are ordered for an end-to-end flow and set reusable collection variables from responses."
+  },
+  "item": [
+    {
+      "name": "Players",
+      "item": [
+        {
+          "name": "Create Host Player",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "const playerId = data.playerId || data.PlayerId;",
+                  "const playerToken = data.playerToken || data.PlayerToken;",
+                  "const playerName = data.name || data.Name;",
+                  "",
+                  "if (playerId) pm.collectionVariables.set('playerId', playerId);",
+                  "if (playerToken) pm.collectionVariables.set('playerToken', playerToken);",
+                  "if (playerName) pm.collectionVariables.set('hostName', playerName);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{hostName}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/players",
+            "description": "Creates the primary player and stores playerId/playerToken for authenticated endpoints."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Player By Id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/players/{{playerId}}",
+            "description": "Fetches the host player created in the previous step."
+          },
+          "response": []
+        },
+        {
+          "name": "Rename Current Host Player",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "const playerName = data.name || data.Name;",
+                  "if (playerName) pm.collectionVariables.set('hostName', playerName);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Player-Token",
+                "value": "{{playerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{renamedHostName}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/players/me",
+            "description": "Renames current authenticated host player."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Guest Player",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "const playerId = data.playerId || data.PlayerId;",
+                  "const playerToken = data.playerToken || data.PlayerToken;",
+                  "const playerName = data.name || data.Name;",
+                  "",
+                  "if (playerId) pm.collectionVariables.set('guestPlayerId', playerId);",
+                  "if (playerToken) pm.collectionVariables.set('guestPlayerToken', playerToken);",
+                  "if (playerName) pm.collectionVariables.set('guestName', playerName);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{guestName}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/players",
+            "description": "Creates a second player used for join/leave/start game tests."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Third Player",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "const playerId = data.playerId || data.PlayerId;",
+                  "const playerToken = data.playerToken || data.PlayerToken;",
+                  "const playerName = data.name || data.Name;",
+                  "",
+                  "if (playerId) pm.collectionVariables.set('thirdPlayerId', playerId);",
+                  "if (playerToken) pm.collectionVariables.set('thirdPlayerToken', playerToken);",
+                  "if (playerName) pm.collectionVariables.set('thirdName', playerName);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{thirdName}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/players",
+            "description": "Creates a third player to satisfy game start minimum player count."
+          },
+          "response": []
+        },
+        {
+          "name": "End Third Session",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Player-Token",
+                "value": "{{thirdPlayerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/players/session",
+            "description": "Deletes third player session (cleanup)."
+          },
+          "response": []
+        },
+        {
+          "name": "End Guest Session",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Player-Token",
+                "value": "{{guestPlayerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/players/session",
+            "description": "Deletes guest player session (cleanup)."
+          },
+          "response": []
+        },
+        {
+          "name": "End Host Session",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Player-Token",
+                "value": "{{playerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/players/session",
+            "description": "Deletes host player session (cleanup)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Games",
+      "item": [
+        {
+          "name": "Create Game (Host)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "const gameId = data.gameId || data.GameId;",
+                  "if (gameId) pm.collectionVariables.set('gameId', gameId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Player-Token",
+                "value": "{{playerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{gameName}}\",\n  \"maxPlayers\": {{maxPlayers}},\n  \"discussionTime\": {{discussionTime}},\n  \"votingTime\": {{votingTime}},\n  \"passcode\": \"{{gamePasscode}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/games",
+            "description": "Creates a lobby game as host and stores gameId."
+          },
+          "response": []
+        },
+        {
+          "name": "List Lobby Games",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "if (!pm.collectionVariables.get('gameId') && Array.isArray(data) && data.length > 0) {",
+                  "  const first = data[0];",
+                  "  const gameId = first.gameId || first.GameId;",
+                  "  if (gameId) pm.collectionVariables.set('gameId', gameId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Player-Token",
+                "value": "{{playerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/games?state=lobby&skip=0&take=50",
+            "description": "Lists open lobby games."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Game By Id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Player-Token",
+                "value": "{{playerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/games/{{gameId}}",
+            "description": "Gets game detail by route gameId."
+          },
+          "response": []
+        },
+        {
+          "name": "Join Game (Guest)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Player-Token",
+                "value": "{{guestPlayerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"passcode\": \"{{gamePasscode}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/games/{{gameId}}/join",
+            "description": "Guest joins host lobby using passcode."
+          },
+          "response": []
+        },
+        {
+          "name": "Join Game With Wrong Passcode (Expected 403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', function () {",
+                  "  pm.response.to.have.status(403);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Player-Token",
+                "value": "{{guestPlayerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"passcode\": \"wrong-passcode\"\n}"
+            },
+            "url": "{{baseUrl}}/api/games/{{gameId}}/join",
+            "description": "Negative test for join endpoint."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Start Game (Host)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "const gameId = data.gameId || data.GameId;",
+                  "if (gameId) pm.collectionVariables.set('startGameId', gameId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Player-Token",
+                "value": "{{playerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{startGameName}}\",\n  \"maxPlayers\": {{maxPlayers}},\n  \"discussionTime\": {{discussionTime}},\n  \"votingTime\": {{votingTime}},\n  \"passcode\": \"{{gamePasscode}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/games",
+            "description": "Creates a separate game used only for start endpoint validations."
+          },
+          "response": []
+        },
+        {
+          "name": "Join Start Game (Guest)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Player-Token",
+                "value": "{{guestPlayerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"passcode\": \"{{gamePasscode}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/games/{{startGameId}}/join",
+            "description": "Guest joins the start-test game."
+          },
+          "response": []
+        },
+        {
+          "name": "Join Start Game (Third Player)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Player-Token",
+                "value": "{{thirdPlayerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"passcode\": \"{{gamePasscode}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/games/{{startGameId}}/join",
+            "description": "Third player joins so start-test game has at least 3 players."
+          },
+          "response": []
+        },
+        {
+          "name": "Start Game (Guest, Expected 403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', function () {",
+                  "  pm.response.to.have.status(403);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Player-Token",
+                "value": "{{guestPlayerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/games/{{startGameId}}/start",
+            "description": "Host-only validation for starting a game."
+          },
+          "response": []
+        },
+        {
+          "name": "Start Game (Host)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "const state = data.state || data.State;",
+                  "pm.test('Game moved to InProgress', function () {",
+                  "  pm.expect(state).to.eql('InProgress');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Player-Token",
+                "value": "{{playerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/games/{{startGameId}}/start",
+            "description": "Starts game as host on the start-test game (requires at least 3 players)."
+          },
+          "response": []
+        },
+        {
+          "name": "Leave Game (Guest)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Player-Token",
+                "value": "{{guestPlayerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/games/{{gameId}}/players/me",
+            "description": "Guest leaves the game."
+          },
+          "response": []
+        },
+        {
+          "name": "Leave Game (Host)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Player-Token",
+                "value": "{{playerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/games/{{gameId}}/players/me",
+            "description": "Host leaves the game; if no players remain game is removed."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://localhost:5001"
+    },
+    {
+      "key": "hostName",
+      "value": "host-player"
+    },
+    {
+      "key": "renamedHostName",
+      "value": "host-player-renamed"
+    },
+    {
+      "key": "guestName",
+      "value": "guest-player"
+    },
+    {
+      "key": "thirdName",
+      "value": "third-player"
+    },
+    {
+      "key": "gameName",
+      "value": "Lobby Alpha"
+    },
+    {
+      "key": "startGameName",
+      "value": "Start Lobby Alpha"
+    },
+    {
+      "key": "gamePasscode",
+      "value": "1234"
+    },
+    {
+      "key": "maxPlayers",
+      "value": "10"
+    },
+    {
+      "key": "discussionTime",
+      "value": "60"
+    },
+    {
+      "key": "votingTime",
+      "value": "60"
+    },
+    {
+      "key": "playerId",
+      "value": ""
+    },
+    {
+      "key": "playerToken",
+      "value": ""
+    },
+    {
+      "key": "guestPlayerId",
+      "value": ""
+    },
+    {
+      "key": "guestPlayerToken",
+      "value": ""
+    },
+    {
+      "key": "thirdPlayerId",
+      "value": ""
+    },
+    {
+      "key": "thirdPlayerToken",
+      "value": ""
+    },
+    {
+      "key": "gameId",
+      "value": ""
+    },
+    {
+      "key": "startGameId",
+      "value": ""
+    }
+  ]
+}

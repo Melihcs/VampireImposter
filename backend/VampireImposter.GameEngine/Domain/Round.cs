@@ -30,15 +30,19 @@ public sealed class Round
     // if the eliminated player was Hunter and can pick someone to take down with them (or any rule you want)
     public Guid? HunterTargetPlayerId { get; private set; }
 
-    public Round(Guid id, int roundNumber)
+    public Round(Guid id, int roundNumber, RoundPhase phase = RoundPhase.Voting)
     {
         if (id == Guid.Empty) throw new ArgumentException("Round id cannot be empty.", nameof(id));
         if (roundNumber <= 0) throw new ArgumentOutOfRangeException(nameof(roundNumber), "Round number must be > 0.");
+        if (!Enum.IsDefined(phase))
+            throw new ArgumentOutOfRangeException(nameof(phase), "Invalid round phase.");
+        if (phase == RoundPhase.Finished)
+            throw new ArgumentException("Round cannot start in Finished phase.", nameof(phase));
 
         Id = id;
         RoundNumber = roundNumber;
         StartedAtUtc = DateTimeOffset.UtcNow;
-        Phase = RoundPhase.Voting;
+        Phase = phase;
     }
 
     public void CastVote(Guid voterId, Guid targetId)

@@ -134,12 +134,36 @@ public sealed class Game
         Status = GameStatus.InProgress;
     }
 
-    public Round StartNextRound()
+    public GameStartResult StartGame(Guid requestedByPlayerId)
+    {
+        if (requestedByPlayerId != HostPlayerId)
+            return new GameStartResult(GameStartStatus.HostOnly, "Only the host can start the game.");
+
+        if (Status != GameStatus.Lobby)
+            return new GameStartResult(GameStartStatus.NotJoinable, "Game is not in Lobby state.");
+
+        if (_players.Count < MinPlayersToStart)
+            return new GameStartResult(GameStartStatus.NotEnoughPlayers, "At least 3 players are required to start.");
+
+        try
+        {
+            Start();
+            AssignStartRoles();
+            StartNextRound(RoundPhase.NotStarted);
+            return new GameStartResult(GameStartStatus.Success);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new GameStartResult(GameStartStatus.Conflict, ex.Message);
+        }
+    }
+
+    public Round StartNextRound(RoundPhase phase = RoundPhase.Voting)
     {
         EnsureInProgress();
 
         var roundNumber = _rounds.Count + 1;
-        var round = new Round(Guid.NewGuid(), roundNumber);
+        var round = new Round(Guid.NewGuid(), roundNumber, phase);
 
         _rounds.Add(round);
         return round;
@@ -167,5 +191,18 @@ public sealed class Game
     {
         if (Status != GameStatus.InProgress)
             throw new InvalidOperationException("This action is only allowed when the game is in progress.");
+    }
+
+    private void AssignStartRoles()
+    {
+        var randomizedPlayers = _players
+            .OrderBy(_ => Random.Shared.Next())
+            .ToList();
+
+        randomizedPlayers[0].AssignRole(PlayerRole.Vampire);
+        randomizedPlayers[1].AssignRole(PlayerRole.Hunter);
+
+        for (var i = 2; i < randomizedPlayers.Count; i++)
+            randomizedPlayers[i].AssignRole(PlayerRole.Villager);
     }
 }
