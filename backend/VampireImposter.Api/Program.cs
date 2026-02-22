@@ -1,5 +1,6 @@
 using VampireImposter.Api.Application;
 using VampireImposter.Api.Application.Security;
+using VampireImposter.Api.Hubs;
 using VampireImposter.Storage;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -7,6 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddControllers();
+builder.Services.AddSignalR();
 builder.Services.AddOpenApi();
 builder.Services.AddSingleton<IPlayerStore, InMemoryPlayerStore>();
 builder.Services.AddSingleton<IGameStore, InMemoryGameStore>();
@@ -29,5 +31,6 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.MapControllers();
+app.MapHub<GameHub>("/hubs/game");
 
 app.Run();

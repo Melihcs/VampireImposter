@@ -63,7 +63,8 @@ public sealed class GameDomainTests
 
         Assert.AreEqual(killTarget, result.KilledPlayerId);
         Assert.AreEqual(vampire.Id, result.HunterCheckedPlayerId);
-        Assert.IsTrue(result.HunterDetectedVampire == true);
+        Assert.IsTrue(result.HunterDetectedVampire.HasValue);
+        Assert.IsTrue(result.HunterDetectedVampire.Value);
         Assert.AreEqual(RoundPhase.Reveal, round.Phase);
         Assert.IsFalse(game.GetPlayer(killTarget).IsAlive);
     }

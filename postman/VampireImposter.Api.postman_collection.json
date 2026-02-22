@@ -242,7 +242,7 @@
       ]
     },
     {
-      "name": "Games",
+      "name": "Game Creation",
       "item": [
         {
           "name": "Create Game (Host)",
@@ -594,6 +594,41 @@
           "response": []
         },
         {
+          "name": "Leave Game (Guest)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Player-Token",
+                "value": "{{guestPlayerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/games/{{gameId}}/players/me",
+            "description": "Guest leaves the game."
+          },
+          "response": []
+        },
+        {
+          "name": "Leave Game (Host)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Player-Token",
+                "value": "{{playerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/games/{{gameId}}/players/me",
+            "description": "Host leaves the game; if no players remain game is removed."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Rounds",
+      "item": [
+        {
           "name": "Get Hunter Result (Current Player)",
           "event": [
             {
@@ -905,34 +940,27 @@
             "description": "Manual endpoint test. Run when current round is finished and game is still in progress."
           },
           "response": []
-        },
+        }
+      ]
+    },
+    {
+      "name": "SignalR Testing",
+      "item": [
         {
-          "name": "Leave Game (Guest)",
+          "name": "Connect Game Hub (WebSocket)",
           "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "X-Player-Token",
-                "value": "{{guestPlayerToken}}"
-              }
-            ],
-            "url": "{{baseUrl}}/api/games/{{gameId}}/players/me",
-            "description": "Guest leaves the game."
+            "method": "GET",
+            "url": "{{wsBaseUrl}}/hubs/game",
+            "description": "Open a WebSocket request in Postman and connect to SignalR hub endpoint."
           },
           "response": []
         },
         {
-          "name": "Leave Game (Host)",
+          "name": "SignalR Frames (Manual)",
           "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "X-Player-Token",
-                "value": "{{playerToken}}"
-              }
-            ],
-            "url": "{{baseUrl}}/api/games/{{gameId}}/players/me",
-            "description": "Host leaves the game; if no players remain game is removed."
+            "method": "GET",
+            "url": "{{wsBaseUrl}}/hubs/game",
+            "description": "After connecting, send: 1) {\\\"protocol\\\":\\\"json\\\",\\\"version\\\":1}\\u001e 2) {\\\"type\\\":1,\\\"target\\\":\\\"JoinGameChannel\\\",\\\"arguments\\\":[\\\"{{startGameId}}\\\",\\\"{{playerToken}}\\\"],\\\"invocationId\\\":\\\"1\\\"}\\u001e"
           },
           "response": []
         }
@@ -1027,6 +1055,10 @@
     {
       "key": "executedPlayerId",
       "value": ""
+    },
+    {
+      "key": "wsBaseUrl",
+      "value": "ws://localhost:5000"
     }
   ]
 }
