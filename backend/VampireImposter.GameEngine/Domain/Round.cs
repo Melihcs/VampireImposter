@@ -3,16 +3,20 @@ namespace VampireImposter.GameEngine.Domain;
 public enum RoundPhase
 {
     NotStarted = 0,
-    Voting = 1,
+    Question = 1,
     Reveal = 2,
-    Finished = 3
+    Discussion = 3,
+    Voting = 4,
+    Finished = 5
 }
 
 public sealed record Vote(Guid VoterId, Guid TargetId, DateTimeOffset CastAtUtc);
+public sealed record RoundAction(Guid PlayerId, Guid SelectedPlayerId, DateTimeOffset SubmittedAtUtc);
 
 public sealed class Round
 {
     private readonly Dictionary<Guid, Vote> _votesByVoter = new();
+    private readonly Dictionary<Guid, RoundAction> _actionsByPlayer = new();
 
     public Guid Id { get; }
     public int RoundNumber { get; }
@@ -23,12 +27,24 @@ public sealed class Round
 
     // votes (one per voter)
     public IReadOnlyCollection<Vote> Votes => _votesByVoter.Values;
+    public IReadOnlyCollection<RoundAction> Actions => _actionsByPlayer.Values;
+    public string? QuestionText { get; private set; }
+    public DateTimeOffset? QuestionStartedAtUtc { get; private set; }
+    public DateTimeOffset? DiscussionStartedAtUtc { get; private set; }
+    public int? DiscussionDurationSeconds { get; private set; }
+    public DateTimeOffset? VotingStartedAtUtc { get; private set; }
+    public int? VotingDurationSeconds { get; private set; }
 
-    // who got eliminated this round (if any)
+    // who got eliminated/executed this round (if any)
     public Guid? EliminatedPlayerId { get; private set; }
+    public Guid? ExecutedPlayerId { get; private set; }
+    public Guid? NightKilledPlayerId { get; private set; }
+    public Guid? HunterCheckedPlayerId { get; private set; }
+    public bool? HunterDetectedVampire { get; private set; }
 
     // if the eliminated player was Hunter and can pick someone to take down with them (or any rule you want)
     public Guid? HunterTargetPlayerId { get; private set; }
+    public Guid? VampireTargetPlayerId { get; private set; }
 
     public Round(Guid id, int roundNumber, RoundPhase phase = RoundPhase.Voting)
     {
@@ -43,6 +59,94 @@ public sealed class Round
         RoundNumber = roundNumber;
         StartedAtUtc = DateTimeOffset.UtcNow;
         Phase = phase;
+    }
+
+    public void BeginQuestion(string questionText)
+    {
+        EnsurePhase(RoundPhase.NotStarted);
+
+        if (string.IsNullOrWhiteSpace(questionText))
+            throw new ArgumentException("Question text cannot be empty.", nameof(questionText));
+
+        QuestionText = questionText.Trim();
+        QuestionStartedAtUtc = DateTimeOffset.UtcNow;
+        Phase = RoundPhase.Question;
+    }
+
+    public void SubmitAction(Guid playerId, Guid selectedPlayerId)
+    {
+        EnsurePhase(RoundPhase.Question);
+
+        if (playerId == Guid.Empty) throw new ArgumentException("Player id cannot be empty.", nameof(playerId));
+        if (selectedPlayerId == Guid.Empty) throw new ArgumentException("Selected player id cannot be empty.", nameof(selectedPlayerId));
+        if (playerId == selectedPlayerId) throw new InvalidOperationException("Player cannot select themselves.");
+
+        _actionsByPlayer[playerId] = new RoundAction(playerId, selectedPlayerId, DateTimeOffset.UtcNow);
+    }
+
+    public bool HasSubmittedAction(Guid playerId) => _actionsByPlayer.ContainsKey(playerId);
+
+    public bool TryGetAction(Guid playerId, out RoundAction? action)
+    {
+        if (_actionsByPlayer.TryGetValue(playerId, out var existing))
+        {
+            action = existing;
+            return true;
+        }
+
+        action = null;
+        return false;
+    }
+
+    public void ResolveNight(Guid? killedPlayerId, Guid? hunterCheckedPlayerId, bool? hunterDetectedVampire)
+    {
+        EnsurePhase(RoundPhase.Question);
+
+        NightKilledPlayerId = killedPlayerId;
+        VampireTargetPlayerId = killedPlayerId;
+        HunterCheckedPlayerId = hunterCheckedPlayerId;
+        HunterDetectedVampire = hunterDetectedVampire;
+
+        Phase = RoundPhase.Reveal;
+    }
+
+    public void BeginDiscussion(int durationSeconds)
+    {
+        EnsurePhase(RoundPhase.Reveal);
+
+        if (durationSeconds <= 0)
+            throw new ArgumentOutOfRangeException(nameof(durationSeconds), "Discussion duration must be > 0.");
+
+        DiscussionDurationSeconds = durationSeconds;
+        DiscussionStartedAtUtc = DateTimeOffset.UtcNow;
+        Phase = RoundPhase.Discussion;
+    }
+
+    public void EndDiscussion()
+    {
+        EnsurePhase(RoundPhase.Discussion);
+    }
+
+    public void BeginVoting(int durationSeconds)
+    {
+        EnsurePhase(RoundPhase.Discussion);
+
+        if (durationSeconds <= 0)
+            throw new ArgumentOutOfRangeException(nameof(durationSeconds), "Voting duration must be > 0.");
+
+        VotingDurationSeconds = durationSeconds;
+        VotingStartedAtUtc = DateTimeOffset.UtcNow;
+        Phase = RoundPhase.Voting;
+    }
+
+    public void EndVotingWithExecution(Guid? executedPlayerId)
+    {
+        EnsurePhase(RoundPhase.Voting);
+
+        ExecutedPlayerId = executedPlayerId;
+        EliminatedPlayerId = executedPlayerId;
+        Phase = RoundPhase.Finished;
+        FinishedAtUtc = DateTimeOffset.UtcNow;
     }
 
     public void CastVote(Guid voterId, Guid targetId)
@@ -113,7 +217,6 @@ public sealed class Round
         if (Phase != expected)
             throw new InvalidOperationException($"This action is only allowed in {expected} phase.");
     }
-    public Guid? VampireTargetPlayerId { get; private set; }
 
     public void SetVampireDecision(Guid targetPlayerId)
     {
