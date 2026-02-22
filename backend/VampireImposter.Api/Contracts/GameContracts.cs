@@ -31,6 +31,73 @@ public sealed class JoinGameRequest
     public required string Passcode { get; set; }
 }
 
+public sealed class AssignRoundQuestionRequest
+{
+    [StringLength(200)]
+    public string? QuestionText { get; set; }
+}
+
+public sealed class SubmitRoundActionRequest
+{
+    [Required]
+    public Guid SelectedPlayerId { get; set; }
+}
+
+public sealed class StartDiscussionRequest
+{
+    [Range(1, int.MaxValue)]
+    public int? DurationSeconds { get; set; }
+}
+
+public sealed class StartVotingRequest
+{
+    [Range(1, int.MaxValue)]
+    public int? DurationSeconds { get; set; }
+}
+
+public sealed class CastVoteRequest
+{
+    [Required]
+    public Guid TargetPlayerId { get; set; }
+}
+
+public sealed class RoundStateDto
+{
+    public int RoundNumber { get; set; }
+    public string Phase { get; set; } = "";
+    public string? QuestionText { get; set; }
+}
+
+public sealed class NightResolutionDto
+{
+    public int RoundNumber { get; set; }
+    public string Phase { get; set; } = "";
+    public Guid? KilledPlayerId { get; set; }
+    public Guid? HunterCheckedPlayerId { get; set; }
+    public bool? HunterDetectedVampire { get; set; }
+}
+
+public sealed class VotingResolutionDto
+{
+    public int RoundNumber { get; set; }
+    public string Phase { get; set; } = "";
+    public Guid? ExecutedPlayerId { get; set; }
+    public string? ExecutedPlayerRole { get; set; }
+}
+
+public sealed class GameAdvanceDto
+{
+    public bool IsGameEnded { get; set; }
+    public string Winner { get; set; } = "None";
+    public int CurrentRoundNumber { get; set; }
+    public string GameState { get; set; } = "";
+}
+
+public sealed class HunterPrivateResultDto
+{
+    public bool IsVampire { get; set; }
+}
+
 public sealed class GameListItemDto
 {
     public Guid GameId { get; set; }

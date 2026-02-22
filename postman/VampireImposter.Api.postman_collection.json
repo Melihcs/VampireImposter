@@ -594,6 +594,319 @@
           "response": []
         },
         {
+          "name": "Get Hunter Result (Current Player)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Player-Token",
+                "value": "{{playerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/games/{{startGameId}}/rounds/hunter-result",
+            "description": "Returns hunter detection result for caller (random for non-hunters)."
+          },
+          "response": []
+        },
+        {
+          "name": "Assign Round Question (Host)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Player-Token",
+                "value": "{{playerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"questionText\": \"{{roundQuestion}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/games/{{startGameId}}/rounds/question",
+            "description": "Host sets (or auto-selects) current round question."
+          },
+          "response": []
+        },
+        {
+          "name": "Close Question Phase (Host)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Player-Token",
+                "value": "{{playerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/games/{{startGameId}}/rounds/question/close",
+            "description": "Resolves night actions and moves phase to reveal."
+          },
+          "response": []
+        },
+        {
+          "name": "Start Discussion Phase (Host)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Player-Token",
+                "value": "{{playerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"durationSeconds\": {{phaseDurationSeconds}}\n}"
+            },
+            "url": "{{baseUrl}}/api/games/{{startGameId}}/rounds/discussion/start",
+            "description": "Starts discussion timer for current round."
+          },
+          "response": []
+        },
+        {
+          "name": "Close Discussion Phase (Host)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Player-Token",
+                "value": "{{playerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/games/{{startGameId}}/rounds/discussion/close",
+            "description": "Ends discussion phase."
+          },
+          "response": []
+        },
+        {
+          "name": "Start Voting Phase (Host)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Player-Token",
+                "value": "{{playerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"durationSeconds\": {{phaseDurationSeconds}}\n}"
+            },
+            "url": "{{baseUrl}}/api/games/{{startGameId}}/rounds/voting/start",
+            "description": "Starts voting phase."
+          },
+          "response": []
+        },
+        {
+          "name": "Close Voting Phase (Host)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "const executedPlayerId = data.executedPlayerId || data.ExecutedPlayerId;",
+                  "if (executedPlayerId) pm.collectionVariables.set('executedPlayerId', executedPlayerId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Player-Token",
+                "value": "{{playerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/games/{{startGameId}}/rounds/voting/close",
+            "description": "Closes voting and executes leading target (if any)."
+          },
+          "response": []
+        },
+        {
+          "name": "Advance Round Or Finish (Host)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Player-Token",
+                "value": "{{playerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/games/{{startGameId}}/rounds/advance",
+            "description": "Evaluates game end and either finishes game or starts next round."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Round Action (Optional Manual)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Player-Token",
+                "value": "{{playerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"selectedPlayerId\": \"{{guestPlayerId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/games/{{startGameId}}/rounds/actions",
+            "description": "Manual endpoint test. Run during Question phase."
+          },
+          "response": []
+        },
+        {
+          "name": "Cast Vote (Optional Manual)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Player-Token",
+                "value": "{{playerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetPlayerId\": \"{{guestPlayerId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/games/{{startGameId}}/rounds/votes",
+            "description": "Manual endpoint test. Run during Voting phase while player is alive."
+          },
+          "response": []
+        },
+        {
+          "name": "Start Next Round (Optional Manual)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Player-Token",
+                "value": "{{playerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/games/{{startGameId}}/rounds/start",
+            "description": "Manual endpoint test. Run when current round is finished and game is still in progress."
+          },
+          "response": []
+        },
+        {
           "name": "Leave Game (Guest)",
           "request": {
             "method": "DELETE",
@@ -656,6 +969,10 @@
       "value": "Start Lobby Alpha"
     },
     {
+      "key": "roundQuestion",
+      "value": "Who is acting the most suspicious right now?"
+    },
+    {
       "key": "gamePasscode",
       "value": "1234"
     },
@@ -670,6 +987,10 @@
     {
       "key": "votingTime",
       "value": "60"
+    },
+    {
+      "key": "phaseDurationSeconds",
+      "value": "10"
     },
     {
       "key": "playerId",
@@ -701,6 +1022,10 @@
     },
     {
       "key": "startGameId",
+      "value": ""
+    },
+    {
+      "key": "executedPlayerId",
       "value": ""
     }
   ]

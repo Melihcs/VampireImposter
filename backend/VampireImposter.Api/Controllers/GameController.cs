@@ -174,7 +174,287 @@ public sealed class GamesController : ControllerBase
         };
     }
 
-    // 4) Leave a game (remove player from token)
+    // 4) Start next round (host only)
+    // POST /api/games/{gameId}/rounds/start
+    [HttpPost("{gameId:guid}/rounds/start")]
+    [RequirePlayer]
+    [RequireGame]
+    [RequireHost]
+    [ProducesResponseType(typeof(RoundStateDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public IActionResult StartRound([FromRoute] Guid gameId)
+    {
+        var game = HttpContext.CurrentGame();
+
+        return ApplyGameMutation(game, () =>
+        {
+            var round = game.StartRound();
+            return Ok(ToRoundStateDto(round));
+        });
+    }
+
+    // 5) Assign question for current round (host only)
+    // POST /api/games/{gameId}/rounds/question
+    [HttpPost("{gameId:guid}/rounds/question")]
+    [RequirePlayer]
+    [RequireGame]
+    [RequireHost]
+    [ProducesResponseType(typeof(RoundStateDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public IActionResult AssignQuestion([FromRoute] Guid gameId, [FromBody] AssignRoundQuestionRequest req)
+    {
+        var game = HttpContext.CurrentGame();
+
+        return ApplyGameMutation(game, () =>
+        {
+            game.AssignRoundQuestion(req.QuestionText);
+            return Ok(ToRoundStateDto(game.GetRound(game.CurrentRoundNumber)));
+        });
+    }
+
+    // 6) Submit round action (alive players only, enforced in domain)
+    // POST /api/games/{gameId}/rounds/actions
+    [HttpPost("{gameId:guid}/rounds/actions")]
+    [RequirePlayer]
+    [RequireGame]
+    [ProducesResponseType(typeof(RoundStateDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public IActionResult SubmitRoundAction([FromRoute] Guid gameId, [FromBody] SubmitRoundActionRequest req)
+    {
+        if (req.SelectedPlayerId == Guid.Empty)
+            return BadRequest(new { error = "SelectedPlayerId is required." });
+
+        var player = HttpContext.CurrentPlayer();
+        var game = HttpContext.CurrentGame();
+
+        return ApplyGameMutation(game, () =>
+        {
+            game.SubmitRoundAction(player.Id, req.SelectedPlayerId);
+            return Ok(ToRoundStateDto(game.GetRound(game.CurrentRoundNumber)));
+        });
+    }
+
+    // 7) Close question phase and resolve night (host only)
+    // POST /api/games/{gameId}/rounds/question/close
+    [HttpPost("{gameId:guid}/rounds/question/close")]
+    [RequirePlayer]
+    [RequireGame]
+    [RequireHost]
+    [ProducesResponseType(typeof(NightResolutionDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public IActionResult CloseQuestionPhase([FromRoute] Guid gameId)
+    {
+        var game = HttpContext.CurrentGame();
+
+        return ApplyGameMutation(game, () =>
+        {
+            var result = game.CloseQuestionPhaseAndResolveNight();
+            var round = game.GetRound(game.CurrentRoundNumber);
+
+            return Ok(new NightResolutionDto
+            {
+                RoundNumber = round.RoundNumber,
+                Phase = round.Phase.ToString(),
+                KilledPlayerId = result.KilledPlayerId,
+                HunterCheckedPlayerId = result.HunterCheckedPlayerId,
+                HunterDetectedVampire = result.HunterDetectedVampire
+            });
+        });
+    }
+
+    // 8) Start discussion phase (host only)
+    // POST /api/games/{gameId}/rounds/discussion/start
+    [HttpPost("{gameId:guid}/rounds/discussion/start")]
+    [RequirePlayer]
+    [RequireGame]
+    [RequireHost]
+    [ProducesResponseType(typeof(RoundStateDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public IActionResult StartDiscussion([FromRoute] Guid gameId, [FromBody] StartDiscussionRequest req)
+    {
+        var game = HttpContext.CurrentGame();
+
+        return ApplyGameMutation(game, () =>
+        {
+            game.StartDiscussionPhase(req.DurationSeconds);
+            return Ok(ToRoundStateDto(game.GetRound(game.CurrentRoundNumber)));
+        });
+    }
+
+    // 9) Close discussion phase (host only)
+    // POST /api/games/{gameId}/rounds/discussion/close
+    [HttpPost("{gameId:guid}/rounds/discussion/close")]
+    [RequirePlayer]
+    [RequireGame]
+    [RequireHost]
+    [ProducesResponseType(typeof(RoundStateDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public IActionResult CloseDiscussion([FromRoute] Guid gameId)
+    {
+        var game = HttpContext.CurrentGame();
+
+        return ApplyGameMutation(game, () =>
+        {
+            game.CloseDiscussionPhase();
+            return Ok(ToRoundStateDto(game.GetRound(game.CurrentRoundNumber)));
+        });
+    }
+
+    // 10) Start voting phase (host only)
+    // POST /api/games/{gameId}/rounds/voting/start
+    [HttpPost("{gameId:guid}/rounds/voting/start")]
+    [RequirePlayer]
+    [RequireGame]
+    [RequireHost]
+    [ProducesResponseType(typeof(RoundStateDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public IActionResult StartVoting([FromRoute] Guid gameId, [FromBody] StartVotingRequest req)
+    {
+        var game = HttpContext.CurrentGame();
+
+        return ApplyGameMutation(game, () =>
+        {
+            game.StartVotingPhase(req.DurationSeconds);
+            return Ok(ToRoundStateDto(game.GetRound(game.CurrentRoundNumber)));
+        });
+    }
+
+    // 11) Cast vote for current round (alive players only, enforced in domain)
+    // POST /api/games/{gameId}/rounds/votes
+    [HttpPost("{gameId:guid}/rounds/votes")]
+    [RequirePlayer]
+    [RequireGame]
+    [ProducesResponseType(typeof(RoundStateDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public IActionResult CastVote([FromRoute] Guid gameId, [FromBody] CastVoteRequest req)
+    {
+        if (req.TargetPlayerId == Guid.Empty)
+            return BadRequest(new { error = "TargetPlayerId is required." });
+
+        var player = HttpContext.CurrentPlayer();
+        var game = HttpContext.CurrentGame();
+
+        return ApplyGameMutation(game, () =>
+        {
+            game.CastVote(player.Id, req.TargetPlayerId);
+            return Ok(ToRoundStateDto(game.GetRound(game.CurrentRoundNumber)));
+        });
+    }
+
+    // 12) Close voting phase and execute leading target (host only)
+    // POST /api/games/{gameId}/rounds/voting/close
+    [HttpPost("{gameId:guid}/rounds/voting/close")]
+    [RequirePlayer]
+    [RequireGame]
+    [RequireHost]
+    [ProducesResponseType(typeof(VotingResolutionDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public IActionResult CloseVoting([FromRoute] Guid gameId)
+    {
+        var game = HttpContext.CurrentGame();
+
+        return ApplyGameMutation(game, () =>
+        {
+            var result = game.CloseVotingPhaseAndExecute();
+            var round = game.GetRound(game.CurrentRoundNumber);
+
+            return Ok(new VotingResolutionDto
+            {
+                RoundNumber = round.RoundNumber,
+                Phase = round.Phase.ToString(),
+                ExecutedPlayerId = result.ExecutedPlayerId,
+                ExecutedPlayerRole = result.ExecutedPlayerRole?.ToString()
+            });
+        });
+    }
+
+    // 13) Advance to next round or finish game (host only)
+    // POST /api/games/{gameId}/rounds/advance
+    [HttpPost("{gameId:guid}/rounds/advance")]
+    [RequirePlayer]
+    [RequireGame]
+    [RequireHost]
+    [ProducesResponseType(typeof(GameAdvanceDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public IActionResult AdvanceRound([FromRoute] Guid gameId)
+    {
+        var game = HttpContext.CurrentGame();
+
+        return ApplyGameMutation(game, () =>
+        {
+            var result = game.AdvanceToNextRoundOrFinish();
+            return Ok(new GameAdvanceDto
+            {
+                IsGameEnded = result.IsGameEnded,
+                Winner = result.Winner.ToString(),
+                CurrentRoundNumber = result.CurrentRoundNumber,
+                GameState = game.Status == GameStatus.Finished ? "Completed" : game.Status.ToString()
+            });
+        });
+    }
+
+    // 14) Get private hunter result (non-hunters receive random true/false)
+    // GET /api/games/{gameId}/rounds/hunter-result
+    [HttpGet("{gameId:guid}/rounds/hunter-result")]
+    [RequirePlayer]
+    [RequireGame]
+    [ProducesResponseType(typeof(HunterPrivateResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public IActionResult GetHunterResult([FromRoute] Guid gameId)
+    {
+        try
+        {
+            var player = HttpContext.CurrentPlayer();
+            var game = HttpContext.CurrentGame();
+            var result = game.GetPrivateHunterResult(player.Id);
+
+            return Ok(new HunterPrivateResultDto { IsVampire = result });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+    }
+
+    // 15) Leave a game (remove player from token)
     // DELETE /api/games/{gameId}/players/me
     [HttpDelete("{gameId:guid}/players/me")]
     [RequirePlayer]
@@ -207,6 +487,35 @@ public sealed class GamesController : ControllerBase
         _games.Upsert(game);
         return Ok(ToDto(game));
     }
+
+    private IActionResult ApplyGameMutation(Game game, Func<IActionResult> mutate)
+    {
+        try
+        {
+            var result = mutate();
+            _games.Upsert(game);
+            return result;
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+    }
+
+    private static RoundStateDto ToRoundStateDto(Round round) => new()
+    {
+        RoundNumber = round.RoundNumber,
+        Phase = round.Phase.ToString(),
+        QuestionText = round.QuestionText
+    };
 
     private static GameDto ToDto(Game g) => new()
     {
