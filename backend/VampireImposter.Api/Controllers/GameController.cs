@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.Mvc;
 using VampireImposter.Api.Application;
+using VampireImposter.Api.Application.Concurrency;
 using VampireImposter.Api.Application.DTO;
 using VampireImposter.Api.Hubs;
 using VampireImposter.Api.Application.Security;
@@ -20,17 +21,20 @@ public sealed class GamesController : ControllerBase
     private readonly IGameStore _games;
     private readonly IGamePasscodeService _passcodeService;
     private readonly IGameOrchestrator _orchestrator;
+    private readonly IGameMutationLock _gameMutationLock;
     private readonly IHubContext<GameHub> _hub;
 
     public GamesController(
         IGameStore games,
         IGamePasscodeService passcodeService,
         IGameOrchestrator orchestrator,
+        IGameMutationLock gameMutationLock,
         IHubContext<GameHub> hub)
     {
         _games = games;
         _passcodeService = passcodeService;
         _orchestrator = orchestrator;
+        _gameMutationLock = gameMutationLock;
         _hub = hub;
     }
 
@@ -81,12 +85,39 @@ public sealed class GamesController : ControllerBase
     [RequirePlayer]
     [RequireGame]
     [ProducesResponseType(typeof(GameDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public IActionResult Get([FromRoute] Guid gameId)
+    public Task<IActionResult> Get([FromRoute] Guid gameId, CancellationToken ct)
     {
-        var game = HttpContext.CurrentGame();
-        return Ok(ToDto(game));
+        var playerId = HttpContext.CurrentPlayer().Id;
+        return ExecuteLockedGameReadAsync(gameId, game =>
+        {
+            if (!IsPlayerInGame(game, playerId))
+                return Forbid();
+
+            return Ok(ToDto(game));
+        }, ct);
+    }
+
+    // GET /api/games/{gameId}/state
+    [HttpGet("{gameId:guid}/state")]
+    [RequirePlayer]
+    [RequireGame]
+    [ProducesResponseType(typeof(GameStateDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public Task<IActionResult> GetState([FromRoute] Guid gameId, CancellationToken ct)
+    {
+        var playerId = HttpContext.CurrentPlayer().Id;
+        return ExecuteLockedGameReadAsync(gameId, game =>
+        {
+            if (!IsPlayerInGame(game, playerId))
+                return Forbid();
+
+            return Ok(ToStateDto(game, playerId));
+        }, ct);
     }
 
     // 1) Create a game and auto-join creator as host
@@ -114,7 +145,8 @@ public sealed class GamesController : ControllerBase
         await PublishGameEventAsync(game.Id, "GameCreated", new
         {
             gameId = game.Id,
-            hostPlayerId = player.Id
+            hostPlayerId = player.Id,
+            serverTimeUtc = DateTimeOffset.UtcNow
         });
         return CreatedAtAction(nameof(Get), new { gameId = game.Id }, ToDto(game));
     }
@@ -132,6 +164,7 @@ public sealed class GamesController : ControllerBase
     public async Task<IActionResult> Join([FromRoute] Guid gameId, [FromBody] JoinGameRequest req, CancellationToken ct)
     {
         var player = HttpContext.CurrentPlayer();
+        await using var gameLock = await _gameMutationLock.AcquireAsync(gameId, ct);
         var result = await _orchestrator.JoinLobbyAsync(
             new JoinLobbyCommand(gameId, player.Id, player.Name, req.Passcode),
             ct);
@@ -143,7 +176,8 @@ public sealed class GamesController : ControllerBase
                 gameId = result.Game.Id,
                 playerId = player.Id,
                 playerName = player.Name,
-                playerCount = result.Game.Players.Count
+                playerCount = result.Game.Players.Count,
+                serverTimeUtc = DateTimeOffset.UtcNow
             });
 
             return Ok(ToDto(result.Game));
@@ -175,40 +209,43 @@ public sealed class GamesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> Start([FromRoute] Guid gameId)
+    public Task<IActionResult> Start([FromRoute] Guid gameId, CancellationToken ct)
     {
         var player = HttpContext.CurrentPlayer();
-        var game = HttpContext.CurrentGame();
-
-        var result = game.StartGame(player.Id);
-
-        if (result.Status == GameStartStatus.Success)
+        return WithLockedGameAsync(gameId, ct, async game =>
         {
-            _games.Upsert(game);
-            await PublishGameEventAsync(game.Id, "GameStarted", new
+            var result = game.StartGame(player.Id);
+
+            if (result.Status == GameStartStatus.Success)
             {
-                gameId = game.Id,
-                status = game.Status.ToString(),
-                roundNumber = game.CurrentRoundNumber,
-                phase = game.GetRound(game.CurrentRoundNumber).Phase.ToString()
-            });
-            return Ok(ToDto(game));
-        }
+                _games.Upsert(game);
+                var round = game.GetRound(game.CurrentRoundNumber);
+                await PublishGameEventAsync(game.Id, "GameStarted", new
+                {
+                    gameId = game.Id,
+                    status = game.Status.ToString(),
+                    roundNumber = game.CurrentRoundNumber,
+                    phase = round.Phase.ToString(),
+                    serverTimeUtc = DateTimeOffset.UtcNow
+                });
+                return Ok(ToDto(game));
+            }
 
-        return result.Status switch
-        {
-            GameStartStatus.HostOnly => Problem(
-                title: "Forbidden",
-                detail: result.Error ?? "Only the host can start the game.",
-                statusCode: StatusCodes.Status403Forbidden),
-            GameStartStatus.NotEnoughPlayers => Conflict(new { error = result.Error ?? "At least 3 players are required to start." }),
-            GameStartStatus.NotJoinable => Conflict(new { error = result.Error ?? "Game is not joinable." }),
-            GameStartStatus.Conflict => Conflict(new { error = result.Error ?? "Unable to start this game." }),
-            _ => Problem(
-                title: "Start failed",
-                detail: "Unexpected start outcome.",
-                statusCode: StatusCodes.Status500InternalServerError)
-        };
+            return result.Status switch
+            {
+                GameStartStatus.HostOnly => Problem(
+                    title: "Forbidden",
+                    detail: result.Error ?? "Only the host can start the game.",
+                    statusCode: StatusCodes.Status403Forbidden),
+                GameStartStatus.NotEnoughPlayers => Conflict(new { error = result.Error ?? "At least 3 players are required to start." }),
+                GameStartStatus.NotJoinable => Conflict(new { error = result.Error ?? "Game is not joinable." }),
+                GameStartStatus.Conflict => Conflict(new { error = result.Error ?? "Unable to start this game." }),
+                _ => Problem(
+                    title: "Start failed",
+                    detail: "Unexpected start outcome.",
+                    statusCode: StatusCodes.Status500InternalServerError)
+            };
+        });
     }
 
     // 4) Start next round (host only)
@@ -222,22 +259,20 @@ public sealed class GamesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> StartRound([FromRoute] Guid gameId)
-    {
-        var game = HttpContext.CurrentGame();
-
-        return await ApplyGameMutationAsync(game, () =>
+    public Task<IActionResult> StartRound([FromRoute] Guid gameId, CancellationToken ct)
+        => ApplyLockedGameMutationAsync(gameId, game =>
         {
             var round = game.StartRound();
             return Ok(ToRoundStateDto(round));
         },
-        () => PublishGameEventAsync(game.Id, "RoundStarted", new
+        game => PublishGameEventAsync(game.Id, "RoundStarted", new
         {
             gameId = game.Id,
             roundNumber = game.CurrentRoundNumber,
-            phase = game.GetRound(game.CurrentRoundNumber).Phase.ToString()
-        }));
-    }
+            phase = game.GetRound(game.CurrentRoundNumber).Phase.ToString(),
+            serverTimeUtc = DateTimeOffset.UtcNow
+        }),
+        ct);
 
     // 5) Assign question for current round (host only)
     // POST /api/games/{gameId}/rounds/question
@@ -250,16 +285,13 @@ public sealed class GamesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> AssignQuestion([FromRoute] Guid gameId, [FromBody] AssignRoundQuestionRequest req)
-    {
-        var game = HttpContext.CurrentGame();
-
-        return await ApplyGameMutationAsync(game, () =>
+    public Task<IActionResult> AssignQuestion([FromRoute] Guid gameId, [FromBody] AssignRoundQuestionRequest req, CancellationToken ct)
+        => ApplyLockedGameMutationAsync(gameId, game =>
         {
             game.AssignRoundQuestion(req.QuestionText);
             return Ok(ToRoundStateDto(game.GetRound(game.CurrentRoundNumber)));
         },
-        () =>
+        game =>
         {
             var round = game.GetRound(game.CurrentRoundNumber);
             return PublishGameEventAsync(game.Id, "QuestionAssigned", new
@@ -267,10 +299,12 @@ public sealed class GamesController : ControllerBase
                 gameId = game.Id,
                 roundNumber = round.RoundNumber,
                 phase = round.Phase.ToString(),
-                questionText = round.QuestionText
+                questionText = round.QuestionText,
+                questionStartedAtUtc = round.QuestionStartedAtUtc,
+                serverTimeUtc = DateTimeOffset.UtcNow
             });
-        });
-    }
+        },
+        ct);
 
     // 6) Submit round action (alive players only, enforced in domain)
     // POST /api/games/{gameId}/rounds/actions
@@ -281,25 +315,26 @@ public sealed class GamesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> SubmitRoundAction([FromRoute] Guid gameId, [FromBody] SubmitRoundActionRequest req)
+    public Task<IActionResult> SubmitRoundAction([FromRoute] Guid gameId, [FromBody] SubmitRoundActionRequest req, CancellationToken ct)
     {
         if (req.SelectedPlayerId == Guid.Empty)
-            return BadRequest(new { error = "SelectedPlayerId is required." });
+            return Task.FromResult<IActionResult>(BadRequest(new { error = "SelectedPlayerId is required." }));
 
         var player = HttpContext.CurrentPlayer();
-        var game = HttpContext.CurrentGame();
 
-        return await ApplyGameMutationAsync(game, () =>
-        {
-            game.SubmitRoundAction(player.Id, req.SelectedPlayerId);
-            return Ok(ToRoundStateDto(game.GetRound(game.CurrentRoundNumber)));
-        },
-        () => PublishGameEventAsync(game.Id, "RoundActionSubmitted", new
-        {
-            gameId = game.Id,
-            roundNumber = game.CurrentRoundNumber,
-            playerId = player.Id
-        }));
+        return ApplyLockedGameMutationAsync(gameId, game =>
+            {
+                game.SubmitRoundAction(player.Id, req.SelectedPlayerId);
+                return Ok(ToRoundStateDto(game.GetRound(game.CurrentRoundNumber)));
+            },
+            game => PublishGameEventAsync(game.Id, "RoundActionSubmitted", new
+            {
+                gameId = game.Id,
+                roundNumber = game.CurrentRoundNumber,
+                playerId = player.Id,
+                serverTimeUtc = DateTimeOffset.UtcNow
+            }),
+            ct);
     }
 
     // 7) Close question phase and resolve night (host only)
@@ -313,12 +348,10 @@ public sealed class GamesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> CloseQuestionPhase([FromRoute] Guid gameId)
+    public Task<IActionResult> CloseQuestionPhase([FromRoute] Guid gameId, CancellationToken ct)
     {
-        var game = HttpContext.CurrentGame();
-
         NightResolutionResult? resolution = null;
-        return await ApplyGameMutationAsync(game, () =>
+        return ApplyLockedGameMutationAsync(gameId, game =>
         {
             var result = game.CloseQuestionPhaseAndResolveNight();
             resolution = result;
@@ -328,12 +361,10 @@ public sealed class GamesController : ControllerBase
             {
                 RoundNumber = round.RoundNumber,
                 Phase = round.Phase.ToString(),
-                KilledPlayerId = result.KilledPlayerId,
-                HunterCheckedPlayerId = result.HunterCheckedPlayerId,
-                HunterDetectedVampire = result.HunterDetectedVampire
+                KilledPlayerId = result.KilledPlayerId
             });
         },
-        () =>
+        game =>
         {
             var round = game.GetRound(game.CurrentRoundNumber);
             return PublishGameEventAsync(game.Id, "NightResolved", new
@@ -342,9 +373,10 @@ public sealed class GamesController : ControllerBase
                 roundNumber = round.RoundNumber,
                 phase = round.Phase.ToString(),
                 killedPlayerId = resolution?.KilledPlayerId,
-                hunterCheckedPlayerId = resolution?.HunterCheckedPlayerId
+                serverTimeUtc = DateTimeOffset.UtcNow
             });
-        });
+        },
+        ct);
     }
 
     // 8) Start discussion phase (host only)
@@ -358,26 +390,28 @@ public sealed class GamesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> StartDiscussion([FromRoute] Guid gameId, [FromBody] StartDiscussionRequest req)
-    {
-        var game = HttpContext.CurrentGame();
-
-        return await ApplyGameMutationAsync(game, () =>
+    public Task<IActionResult> StartDiscussion([FromRoute] Guid gameId, [FromBody] StartDiscussionRequest req, CancellationToken ct)
+        => ApplyLockedGameMutationAsync(gameId, game =>
         {
             game.StartDiscussionPhase(req.DurationSeconds);
             return Ok(ToRoundStateDto(game.GetRound(game.CurrentRoundNumber)));
         },
-        () =>
+        game =>
         {
             var round = game.GetRound(game.CurrentRoundNumber);
+            var discussionEndsAtUtc = ComputeEndsAtUtc(round.DiscussionStartedAtUtc, round.DiscussionDurationSeconds);
             return PublishGameEventAsync(game.Id, "DiscussionStarted", new
             {
                 gameId = game.Id,
                 roundNumber = round.RoundNumber,
-                phase = round.Phase.ToString()
+                phase = round.Phase.ToString(),
+                discussionStartedAtUtc = round.DiscussionStartedAtUtc,
+                discussionDurationSeconds = round.DiscussionDurationSeconds,
+                discussionEndsAtUtc,
+                serverTimeUtc = DateTimeOffset.UtcNow
             });
-        });
-    }
+        },
+        ct);
 
     // 9) Close discussion phase (host only)
     // POST /api/games/{gameId}/rounds/discussion/close
@@ -390,21 +424,22 @@ public sealed class GamesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> CloseDiscussion([FromRoute] Guid gameId)
-    {
-        var game = HttpContext.CurrentGame();
-
-        return await ApplyGameMutationAsync(game, () =>
+    public Task<IActionResult> CloseDiscussion([FromRoute] Guid gameId, CancellationToken ct)
+        => ApplyLockedGameMutationAsync(gameId, game =>
         {
+            var round = game.GetRound(game.CurrentRoundNumber);
+            EnsurePhaseTimerElapsed(round.DiscussionStartedAtUtc, round.DiscussionDurationSeconds, "Discussion");
             game.CloseDiscussionPhase();
             return Ok(ToRoundStateDto(game.GetRound(game.CurrentRoundNumber)));
         },
-        () => PublishGameEventAsync(game.Id, "DiscussionClosed", new
+        game => PublishGameEventAsync(game.Id, "DiscussionClosed", new
         {
             gameId = game.Id,
-            roundNumber = game.CurrentRoundNumber
-        }));
-    }
+            roundNumber = game.CurrentRoundNumber,
+            phase = game.GetRound(game.CurrentRoundNumber).Phase.ToString(),
+            serverTimeUtc = DateTimeOffset.UtcNow
+        }),
+        ct);
 
     // 10) Start voting phase (host only)
     // POST /api/games/{gameId}/rounds/voting/start
@@ -417,26 +452,28 @@ public sealed class GamesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> StartVoting([FromRoute] Guid gameId, [FromBody] StartVotingRequest req)
-    {
-        var game = HttpContext.CurrentGame();
-
-        return await ApplyGameMutationAsync(game, () =>
+    public Task<IActionResult> StartVoting([FromRoute] Guid gameId, [FromBody] StartVotingRequest req, CancellationToken ct)
+        => ApplyLockedGameMutationAsync(gameId, game =>
         {
             game.StartVotingPhase(req.DurationSeconds);
             return Ok(ToRoundStateDto(game.GetRound(game.CurrentRoundNumber)));
         },
-        () =>
+        game =>
         {
             var round = game.GetRound(game.CurrentRoundNumber);
+            var votingEndsAtUtc = ComputeEndsAtUtc(round.VotingStartedAtUtc, round.VotingDurationSeconds);
             return PublishGameEventAsync(game.Id, "VotingStarted", new
             {
                 gameId = game.Id,
                 roundNumber = round.RoundNumber,
-                phase = round.Phase.ToString()
+                phase = round.Phase.ToString(),
+                votingStartedAtUtc = round.VotingStartedAtUtc,
+                votingDurationSeconds = round.VotingDurationSeconds,
+                votingEndsAtUtc,
+                serverTimeUtc = DateTimeOffset.UtcNow
             });
-        });
-    }
+        },
+        ct);
 
     // 11) Cast vote for current round (alive players only, enforced in domain)
     // POST /api/games/{gameId}/rounds/votes
@@ -447,26 +484,27 @@ public sealed class GamesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> CastVote([FromRoute] Guid gameId, [FromBody] CastVoteRequest req)
+    public Task<IActionResult> CastVote([FromRoute] Guid gameId, [FromBody] CastVoteRequest req, CancellationToken ct)
     {
         if (req.TargetPlayerId == Guid.Empty)
-            return BadRequest(new { error = "TargetPlayerId is required." });
+            return Task.FromResult<IActionResult>(BadRequest(new { error = "TargetPlayerId is required." }));
 
         var player = HttpContext.CurrentPlayer();
-        var game = HttpContext.CurrentGame();
 
-        return await ApplyGameMutationAsync(game, () =>
-        {
-            game.CastVote(player.Id, req.TargetPlayerId);
-            return Ok(ToRoundStateDto(game.GetRound(game.CurrentRoundNumber)));
-        },
-        () => PublishGameEventAsync(game.Id, "VoteCast", new
-        {
-            gameId = game.Id,
-            roundNumber = game.CurrentRoundNumber,
-            voterPlayerId = player.Id,
-            targetPlayerId = req.TargetPlayerId
-        }));
+        return ApplyLockedGameMutationAsync(gameId, game =>
+            {
+                game.CastVote(player.Id, req.TargetPlayerId);
+                return Ok(ToRoundStateDto(game.GetRound(game.CurrentRoundNumber)));
+            },
+            game => PublishGameEventAsync(game.Id, "VoteCast", new
+            {
+                gameId = game.Id,
+                roundNumber = game.CurrentRoundNumber,
+                voterPlayerId = player.Id,
+                targetPlayerId = req.TargetPlayerId,
+                serverTimeUtc = DateTimeOffset.UtcNow
+            }),
+            ct);
     }
 
     // 12) Close voting phase and execute leading target (host only)
@@ -480,16 +518,16 @@ public sealed class GamesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> CloseVoting([FromRoute] Guid gameId)
+    public Task<IActionResult> CloseVoting([FromRoute] Guid gameId, CancellationToken ct)
     {
-        var game = HttpContext.CurrentGame();
-
         VotingResolutionResult? votingResult = null;
-        return await ApplyGameMutationAsync(game, () =>
+        return ApplyLockedGameMutationAsync(gameId, game =>
         {
+            var round = game.GetRound(game.CurrentRoundNumber);
+            EnsurePhaseTimerElapsed(round.VotingStartedAtUtc, round.VotingDurationSeconds, "Voting");
             var result = game.CloseVotingPhaseAndExecute();
             votingResult = result;
-            var round = game.GetRound(game.CurrentRoundNumber);
+            round = game.GetRound(game.CurrentRoundNumber);
 
             return Ok(new VotingResolutionDto
             {
@@ -499,7 +537,7 @@ public sealed class GamesController : ControllerBase
                 ExecutedPlayerRole = result.ExecutedPlayerRole?.ToString()
             });
         },
-        () =>
+        game =>
         {
             var round = game.GetRound(game.CurrentRoundNumber);
             return PublishGameEventAsync(game.Id, "VotingClosed", new
@@ -508,9 +546,11 @@ public sealed class GamesController : ControllerBase
                 roundNumber = round.RoundNumber,
                 phase = round.Phase.ToString(),
                 executedPlayerId = votingResult?.ExecutedPlayerId,
-                executedPlayerRole = votingResult?.ExecutedPlayerRole?.ToString()
+                executedPlayerRole = votingResult?.ExecutedPlayerRole?.ToString(),
+                serverTimeUtc = DateTimeOffset.UtcNow
             });
-        });
+        },
+        ct);
     }
 
     // 13) Advance to next round or finish game (host only)
@@ -524,12 +564,10 @@ public sealed class GamesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> AdvanceRound([FromRoute] Guid gameId)
+    public Task<IActionResult> AdvanceRound([FromRoute] Guid gameId, CancellationToken ct)
     {
-        var game = HttpContext.CurrentGame();
-
         AdvanceRoundResult? advanceResult = null;
-        return await ApplyGameMutationAsync(game, () =>
+        return ApplyLockedGameMutationAsync(gameId, game =>
         {
             var result = game.AdvanceToNextRoundOrFinish();
             advanceResult = result;
@@ -541,7 +579,7 @@ public sealed class GamesController : ControllerBase
                 GameState = game.Status == GameStatus.Finished ? "Completed" : game.Status.ToString()
             });
         },
-        () =>
+        game =>
         {
             if (advanceResult is null)
                 return Task.CompletedTask;
@@ -552,16 +590,19 @@ public sealed class GamesController : ControllerBase
                 {
                     gameId = game.Id,
                     winner = advanceResult.Winner.ToString(),
-                    currentRoundNumber = advanceResult.CurrentRoundNumber
+                    currentRoundNumber = advanceResult.CurrentRoundNumber,
+                    serverTimeUtc = DateTimeOffset.UtcNow
                 });
             }
 
             return PublishGameEventAsync(game.Id, "RoundAdvanced", new
             {
                 gameId = game.Id,
-                currentRoundNumber = advanceResult.CurrentRoundNumber
+                currentRoundNumber = advanceResult.CurrentRoundNumber,
+                serverTimeUtc = DateTimeOffset.UtcNow
             });
-        });
+        },
+        ct);
     }
 
     // 14) Get private hunter result (non-hunters receive random true/false)
@@ -570,31 +611,36 @@ public sealed class GamesController : ControllerBase
     [RequirePlayer]
     [RequireGame]
     [ProducesResponseType(typeof(HunterPrivateResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public IActionResult GetHunterResult([FromRoute] Guid gameId)
+    public Task<IActionResult> GetHunterResult([FromRoute] Guid gameId, CancellationToken ct)
     {
-        try
+        var player = HttpContext.CurrentPlayer();
+        return ExecuteLockedGameReadAsync(gameId, game =>
         {
-            var player = HttpContext.CurrentPlayer();
-            var game = HttpContext.CurrentGame();
-            var result = game.GetPrivateHunterResult(player.Id);
+            if (!IsPlayerInGame(game, player.Id))
+                return Forbid();
 
-            return Ok(new HunterPrivateResultDto { IsVampire = result });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Conflict(new { error = ex.Message });
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { error = ex.Message });
-        }
+            try
+            {
+                var result = game.GetPrivateHunterResult(player.Id);
+                return Ok(new HunterPrivateResultDto { IsVampire = result });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { error = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { error = ex.Message });
+            }
+        }, ct);
     }
 
     // 15) Leave a game (remove player from token)
@@ -605,45 +651,96 @@ public sealed class GamesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Leave([FromRoute] Guid gameId)
+    public Task<IActionResult> Leave([FromRoute] Guid gameId, CancellationToken ct)
     {
         var player = HttpContext.CurrentPlayer();
-        var game = HttpContext.CurrentGame();
-        var playerCountBefore = game.Players.Count;
-
-        if (!game.Players.Any(p => p.Id == player.Id))
-            return NoContent(); // idempotent
-
-        game.RemovePlayer(player.Id);
-        var playerCountAfter = game.Players.Count;
-
-        if (game.Players.Count == 0)
+        return WithLockedGameAsync(gameId, ct, async game =>
         {
-            _games.Remove(game.Id);
-            await PublishGameEventAsync(game.Id, "PlayerLeft", new
+            try
             {
-                gameId = game.Id,
-                playerId = player.Id,
-                playerCountBefore,
-                playerCountAfter
-            });
-            await PublishGameEventAsync(game.Id, "GameClosed", new
-            {
-                gameId = game.Id
-            });
-            return NoContent();
-        }
+                var playerCountBefore = game.Players.Count;
 
-        _games.Upsert(game);
-        await PublishGameEventAsync(game.Id, "PlayerLeft", new
-        {
-            gameId = game.Id,
-            playerId = player.Id,
-            playerCountBefore,
-            playerCountAfter
+                if (!game.Players.Any(p => p.Id == player.Id))
+                    return NoContent(); // idempotent
+
+                game.RemovePlayer(player.Id);
+                var playerCountAfter = game.Players.Count;
+
+                if (game.Players.Count == 0)
+                {
+                    _games.Remove(game.Id);
+                    await PublishGameEventAsync(game.Id, "PlayerLeft", new
+                    {
+                        gameId = game.Id,
+                        playerId = player.Id,
+                        playerCountBefore,
+                        playerCountAfter,
+                        serverTimeUtc = DateTimeOffset.UtcNow
+                    });
+                    await PublishGameEventAsync(game.Id, "GameClosed", new
+                    {
+                        gameId = game.Id,
+                        serverTimeUtc = DateTimeOffset.UtcNow
+                    });
+                    return NoContent();
+                }
+
+                _games.Upsert(game);
+                await PublishGameEventAsync(game.Id, "PlayerLeft", new
+                {
+                    gameId = game.Id,
+                    playerId = player.Id,
+                    playerCountBefore,
+                    playerCountAfter,
+                    serverTimeUtc = DateTimeOffset.UtcNow
+                });
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { error = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { error = ex.Message });
+            }
         });
-        return NoContent();
     }
+
+    private async Task<IActionResult> WithLockedGameAsync(
+        Guid gameId,
+        CancellationToken ct,
+        Func<Game, Task<IActionResult>> action)
+    {
+        await using var gameLock = await _gameMutationLock.AcquireAsync(gameId, ct);
+        if (!_games.TryGet(gameId, out var game) || game is null)
+            return NotFound();
+
+        return await action(game);
+    }
+
+    private Task<IActionResult> ExecuteLockedGameReadAsync(
+        Guid gameId,
+        Func<Game, IActionResult> read,
+        CancellationToken ct)
+        => WithLockedGameAsync(gameId, ct, game => Task.FromResult(read(game)));
+
+    private Task<IActionResult> ApplyLockedGameMutationAsync(
+        Guid gameId,
+        Func<Game, IActionResult> mutate,
+        Func<Game, Task>? afterCommit,
+        CancellationToken ct)
+        => WithLockedGameAsync(
+            gameId,
+            ct,
+            game => ApplyGameMutationAsync(
+                game,
+                () => mutate(game),
+                afterCommit is null ? null : () => afterCommit(game)));
 
     private async Task<IActionResult> ApplyGameMutationAsync(
         Game game,
@@ -675,12 +772,82 @@ public sealed class GamesController : ControllerBase
     private Task PublishGameEventAsync(Guid gameId, string eventName, object payload)
         => _hub.Clients.Group(GameHub.GroupName(gameId)).SendAsync(eventName, payload);
 
-    private static RoundStateDto ToRoundStateDto(Round round) => new()
+    private static RoundStateDto ToRoundStateDto(Round round)
     {
-        RoundNumber = round.RoundNumber,
-        Phase = round.Phase.ToString(),
-        QuestionText = round.QuestionText
-    };
+        var discussionEndsAtUtc = ComputeEndsAtUtc(round.DiscussionStartedAtUtc, round.DiscussionDurationSeconds);
+        var votingEndsAtUtc = ComputeEndsAtUtc(round.VotingStartedAtUtc, round.VotingDurationSeconds);
+
+        return new RoundStateDto
+        {
+            RoundNumber = round.RoundNumber,
+            Phase = round.Phase.ToString(),
+            QuestionText = round.QuestionText,
+            ServerTimeUtc = DateTimeOffset.UtcNow,
+            QuestionStartedAtUtc = round.QuestionStartedAtUtc,
+            DiscussionStartedAtUtc = round.DiscussionStartedAtUtc,
+            DiscussionDurationSeconds = round.DiscussionDurationSeconds,
+            DiscussionEndsAtUtc = discussionEndsAtUtc,
+            VotingStartedAtUtc = round.VotingStartedAtUtc,
+            VotingDurationSeconds = round.VotingDurationSeconds,
+            VotingEndsAtUtc = votingEndsAtUtc
+        };
+    }
+
+    private static GameStateDto ToStateDto(Game game, Guid requestingPlayerId)
+    {
+        var requester = game.GetPlayer(requestingPlayerId);
+        var currentRound = game.CurrentRoundNumber > 0 ? game.GetRound(game.CurrentRoundNumber) : null;
+
+        return new GameStateDto
+        {
+            GameId = game.Id,
+            Name = game.Name,
+            State = game.Status == GameStatus.Finished ? "Completed" : game.Status.ToString(),
+            ServerTimeUtc = DateTimeOffset.UtcNow,
+            HostPlayerId = game.HostPlayerId,
+            CurrentRoundNumber = game.CurrentRoundNumber,
+            DiscussionTime = game.DiscussionTime,
+            VotingTime = game.VotingTime,
+            RequestingPlayerId = requester.Id,
+            RequestingPlayerRole = requester.Role.ToString(),
+            RequestingPlayerIsAlive = requester.IsAlive,
+            Players = game.Players
+                .Select(p => new GamePlayerStateDto
+                {
+                    PlayerId = p.Id,
+                    Name = p.Name,
+                    IsAlive = p.IsAlive,
+                    IsHost = p.Id == game.HostPlayerId
+                })
+                .ToArray(),
+            CurrentRound = currentRound is null ? null : ToRoundStateDto(currentRound)
+        };
+    }
+
+    private static DateTimeOffset? ComputeEndsAtUtc(DateTimeOffset? startedAtUtc, int? durationSeconds)
+    {
+        if (!startedAtUtc.HasValue || !durationSeconds.HasValue)
+            return null;
+
+        return startedAtUtc.Value.AddSeconds(durationSeconds.Value);
+    }
+
+    private static bool IsPlayerInGame(Game game, Guid playerId)
+        => game.Players.Any(p => p.Id == playerId);
+
+    private static void EnsurePhaseTimerElapsed(DateTimeOffset? startedAtUtc, int? durationSeconds, string phaseName)
+    {
+        if (!startedAtUtc.HasValue || !durationSeconds.HasValue)
+            throw new InvalidOperationException($"{phaseName} timer is not initialized.");
+
+        var endsAtUtc = startedAtUtc.Value.AddSeconds(durationSeconds.Value);
+        var now = DateTimeOffset.UtcNow;
+        if (now >= endsAtUtc)
+            return;
+
+        var remainingSeconds = Math.Max(1, (int)Math.Ceiling((endsAtUtc - now).TotalSeconds));
+        throw new InvalidOperationException($"{phaseName} timer has {remainingSeconds} second(s) remaining.");
+    }
 
     private static GameDto ToDto(Game g) => new()
     {

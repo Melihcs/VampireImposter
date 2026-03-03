@@ -1,5 +1,7 @@
 using VampireImposter.Api.Application;
+using VampireImposter.Api.Application.Concurrency;
 using VampireImposter.Api.Application.Security;
+using VampireImposter.Api.Application.Timers;
 using VampireImposter.Api.Hubs;
 using VampireImposter.Storage;
 
@@ -12,7 +14,9 @@ builder.Services.AddSignalR();
 builder.Services.AddOpenApi();
 builder.Services.AddSingleton<IPlayerStore, InMemoryPlayerStore>();
 builder.Services.AddSingleton<IGameStore, InMemoryGameStore>();
+builder.Services.AddSingleton<IGameMutationLock, InMemoryGameMutationLock>();
 builder.Services.AddSingleton<IGameOrchestrator, GameOrchestrator>();
+builder.Services.AddHostedService<RoundTimerHostedService>();
 builder.Services
     .AddOptions<PasscodeSecurityOptions>()
     .Bind(builder.Configuration.GetSection(PasscodeSecurityOptions.SectionName))
@@ -34,3 +38,5 @@ app.MapControllers();
 app.MapHub<GameHub>("/hubs/game");
 
 app.Run();
+
+public partial class Program { }

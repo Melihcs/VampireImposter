@@ -348,6 +348,40 @@
           "response": []
         },
         {
+          "name": "Get Game State (Host Resync)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "const serverTimeUtc = data.serverTimeUtc || data.ServerTimeUtc;",
+                  "const currentRoundNumber = data.currentRoundNumber || data.CurrentRoundNumber;",
+                  "if (serverTimeUtc) pm.collectionVariables.set('serverTimeUtc', serverTimeUtc);",
+                  "if (typeof currentRoundNumber !== 'undefined') pm.collectionVariables.set('currentRoundNumber', String(currentRoundNumber));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Player-Token",
+                "value": "{{playerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/games/{{gameId}}/state",
+            "description": "Reconnect/resync endpoint. Returns server-authoritative game + round state for players in the game."
+          },
+          "response": []
+        },
+        {
           "name": "Join Game (Guest)",
           "event": [
             {
@@ -594,6 +628,40 @@
           "response": []
         },
         {
+          "name": "Get Start Game State (Host Resync)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "const serverTimeUtc = data.serverTimeUtc || data.ServerTimeUtc;",
+                  "const currentRoundNumber = data.currentRoundNumber || data.CurrentRoundNumber;",
+                  "if (serverTimeUtc) pm.collectionVariables.set('serverTimeUtc', serverTimeUtc);",
+                  "if (typeof currentRoundNumber !== 'undefined') pm.collectionVariables.set('currentRoundNumber', String(currentRoundNumber));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Player-Token",
+                "value": "{{playerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/games/{{startGameId}}/state",
+            "description": "Reconnect/resync for started game. Includes current round phase and timer fields."
+          },
+          "response": []
+        },
+        {
           "name": "Leave Game (Guest)",
           "request": {
             "method": "DELETE",
@@ -653,6 +721,45 @@
             ],
             "url": "{{baseUrl}}/api/games/{{startGameId}}/rounds/hunter-result",
             "description": "Returns hunter detection result for caller (random for non-hunters)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Round State Snapshot (Host)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "const serverTimeUtc = data.serverTimeUtc || data.ServerTimeUtc;",
+                  "const round = data.currentRound || data.CurrentRound;",
+                  "if (serverTimeUtc) pm.collectionVariables.set('serverTimeUtc', serverTimeUtc);",
+                  "if (round) {",
+                  "  const discussionEndsAtUtc = round.discussionEndsAtUtc || round.DiscussionEndsAtUtc;",
+                  "  const votingEndsAtUtc = round.votingEndsAtUtc || round.VotingEndsAtUtc;",
+                  "  if (discussionEndsAtUtc) pm.collectionVariables.set('discussionEndsAtUtc', discussionEndsAtUtc);",
+                  "  if (votingEndsAtUtc) pm.collectionVariables.set('votingEndsAtUtc', votingEndsAtUtc);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Player-Token",
+                "value": "{{playerToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/games/{{startGameId}}/state",
+            "description": "Reads server state for reconnect/resync between round operations."
           },
           "response": []
         },
@@ -730,7 +837,17 @@
                 "exec": [
                   "pm.test('Status is 200', function () {",
                   "  pm.response.to.have.status(200);",
-                  "});"
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "const serverTimeUtc = data.serverTimeUtc || data.ServerTimeUtc;",
+                  "const discussionStartedAtUtc = data.discussionStartedAtUtc || data.DiscussionStartedAtUtc;",
+                  "const discussionDurationSeconds = data.discussionDurationSeconds || data.DiscussionDurationSeconds;",
+                  "const discussionEndsAtUtc = data.discussionEndsAtUtc || data.DiscussionEndsAtUtc;",
+                  "if (serverTimeUtc) pm.collectionVariables.set('serverTimeUtc', serverTimeUtc);",
+                  "if (discussionStartedAtUtc) pm.collectionVariables.set('discussionStartedAtUtc', discussionStartedAtUtc);",
+                  "if (typeof discussionDurationSeconds !== 'undefined') pm.collectionVariables.set('discussionDurationSeconds', String(discussionDurationSeconds));",
+                  "if (discussionEndsAtUtc) pm.collectionVariables.set('discussionEndsAtUtc', discussionEndsAtUtc);"
                 ]
               }
             }
@@ -780,7 +897,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/games/{{startGameId}}/rounds/discussion/close",
-            "description": "Ends discussion phase."
+            "description": "Ends discussion phase. Must be called after discussion timer expires, otherwise returns 409."
           },
           "response": []
         },
@@ -794,7 +911,17 @@
                 "exec": [
                   "pm.test('Status is 200', function () {",
                   "  pm.response.to.have.status(200);",
-                  "});"
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "const serverTimeUtc = data.serverTimeUtc || data.ServerTimeUtc;",
+                  "const votingStartedAtUtc = data.votingStartedAtUtc || data.VotingStartedAtUtc;",
+                  "const votingDurationSeconds = data.votingDurationSeconds || data.VotingDurationSeconds;",
+                  "const votingEndsAtUtc = data.votingEndsAtUtc || data.VotingEndsAtUtc;",
+                  "if (serverTimeUtc) pm.collectionVariables.set('serverTimeUtc', serverTimeUtc);",
+                  "if (votingStartedAtUtc) pm.collectionVariables.set('votingStartedAtUtc', votingStartedAtUtc);",
+                  "if (typeof votingDurationSeconds !== 'undefined') pm.collectionVariables.set('votingDurationSeconds', String(votingDurationSeconds));",
+                  "if (votingEndsAtUtc) pm.collectionVariables.set('votingEndsAtUtc', votingEndsAtUtc);"
                 ]
               }
             }
@@ -848,7 +975,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/games/{{startGameId}}/rounds/voting/close",
-            "description": "Closes voting and executes leading target (if any)."
+            "description": "Closes voting and executes leading target (if any). Must be called after voting timer expires, otherwise returns 409."
           },
           "response": []
         },
@@ -1019,6 +1146,38 @@
     {
       "key": "phaseDurationSeconds",
       "value": "10"
+    },
+    {
+      "key": "serverTimeUtc",
+      "value": ""
+    },
+    {
+      "key": "currentRoundNumber",
+      "value": ""
+    },
+    {
+      "key": "discussionStartedAtUtc",
+      "value": ""
+    },
+    {
+      "key": "discussionDurationSeconds",
+      "value": ""
+    },
+    {
+      "key": "discussionEndsAtUtc",
+      "value": ""
+    },
+    {
+      "key": "votingStartedAtUtc",
+      "value": ""
+    },
+    {
+      "key": "votingDurationSeconds",
+      "value": ""
+    },
+    {
+      "key": "votingEndsAtUtc",
+      "value": ""
     },
     {
       "key": "playerId",

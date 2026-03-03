@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
   title: VampireImposter API
-  version: 1.0.0
-  description: OpenAPI document for currently implemented backend endpoints.
+  version: 1.1.0
+  description: OpenAPI document for implemented Player, Game, and Round endpoints.
 servers:
   - url: https://localhost:5001
     description: HTTPS local dev
@@ -12,6 +12,8 @@ servers:
 tags:
   - name: Players
   - name: Games
+  - name: Rounds
+  - name: Realtime
 
 paths:
   /api/players:
@@ -45,12 +47,7 @@ paths:
       summary: Get player by id
       operationId: getPlayerById
       parameters:
-        - name: playerId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+        - $ref: '#/components/parameters/PlayerIdPath'
       responses:
         '200':
           description: Player found
@@ -90,10 +87,6 @@ paths:
                 $ref: '#/components/schemas/ProblemDetails'
         '401':
           description: Unauthorized
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
         '409':
           description: Conflict
           content:
@@ -202,12 +195,7 @@ paths:
         - PlayerTokenHeader: []
         - BearerAuth: []
       parameters:
-        - name: gameId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+        - $ref: '#/components/parameters/GameIdPath'
       responses:
         '200':
           description: Game found
@@ -217,6 +205,32 @@ paths:
                 $ref: '#/components/schemas/GameDto'
         '401':
           description: Unauthorized
+        '403':
+          description: Authenticated player is not part of this game
+        '404':
+          description: Game not found
+
+  /api/games/{gameId}/state:
+    get:
+      tags: [Games]
+      summary: Get reconnect/resync state
+      operationId: getGameState
+      security:
+        - PlayerTokenHeader: []
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      responses:
+        '200':
+          description: Server-authoritative game and round state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameStateDto'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Authenticated player is not part of this game
         '404':
           description: Game not found
 
@@ -229,12 +243,7 @@ paths:
         - PlayerTokenHeader: []
         - BearerAuth: []
       parameters:
-        - name: gameId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+        - $ref: '#/components/parameters/GameIdPath'
       requestBody:
         required: true
         content:
@@ -248,12 +257,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GameDto'
-        '400':
-          description: Invalid request
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
         '401':
           description: Unauthorized
         '403':
@@ -271,6 +274,40 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/games/{gameId}/start:
+    post:
+      tags: [Games]
+      summary: Start game
+      operationId: startGame
+      security:
+        - PlayerTokenHeader: []
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      responses:
+        '200':
+          description: Game started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameDto'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Only host can start
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '404':
+          description: Game not found
+        '409':
+          description: Invalid state or not enough players
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/games/{gameId}/players/me:
     delete:
       tags: [Games]
@@ -280,12 +317,7 @@ paths:
         - PlayerTokenHeader: []
         - BearerAuth: []
       parameters:
-        - name: gameId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+        - $ref: '#/components/parameters/GameIdPath'
       responses:
         '204':
           description: Left game
@@ -293,6 +325,385 @@ paths:
           description: Unauthorized
         '404':
           description: Game not found
+
+  /api/games/{gameId}/rounds/start:
+    post:
+      tags: [Rounds]
+      summary: Start next round
+      operationId: startRound
+      security:
+        - PlayerTokenHeader: []
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      responses:
+        '200':
+          description: Round started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoundStateDto'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Only host can perform this action
+        '404':
+          description: Game not found
+        '409':
+          description: Invalid round state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/games/{gameId}/rounds/question:
+    post:
+      tags: [Rounds]
+      summary: Assign question for current round
+      operationId: assignRoundQuestion
+      security:
+        - PlayerTokenHeader: []
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignRoundQuestionRequest'
+      responses:
+        '200':
+          description: Question assigned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoundStateDto'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Only host can perform this action
+        '404':
+          description: Game not found
+        '409':
+          description: Invalid round state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/games/{gameId}/rounds/actions:
+    post:
+      tags: [Rounds]
+      summary: Submit round action (question phase)
+      operationId: submitRoundAction
+      security:
+        - PlayerTokenHeader: []
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitRoundActionRequest'
+      responses:
+        '200':
+          description: Action submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoundStateDto'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Game not found
+        '409':
+          description: Invalid round state or dead player
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/games/{gameId}/rounds/question/close:
+    post:
+      tags: [Rounds]
+      summary: Resolve night and close question phase
+      operationId: closeQuestionPhase
+      security:
+        - PlayerTokenHeader: []
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      responses:
+        '200':
+          description: Night resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NightResolutionDto'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Only host can perform this action
+        '404':
+          description: Game not found
+        '409':
+          description: Invalid round state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/games/{gameId}/rounds/discussion/start:
+    post:
+      tags: [Rounds]
+      summary: Start discussion phase
+      operationId: startDiscussion
+      security:
+        - PlayerTokenHeader: []
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartDiscussionRequest'
+      responses:
+        '200':
+          description: Discussion started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoundStateDto'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Only host can perform this action
+        '404':
+          description: Game not found
+        '409':
+          description: Invalid round state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/games/{gameId}/rounds/discussion/close:
+    post:
+      tags: [Rounds]
+      summary: Close discussion phase
+      operationId: closeDiscussion
+      security:
+        - PlayerTokenHeader: []
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      responses:
+        '200':
+          description: Discussion closed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoundStateDto'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Only host can perform this action
+        '404':
+          description: Game not found
+        '409':
+          description: Discussion timer still active or invalid state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/games/{gameId}/rounds/voting/start:
+    post:
+      tags: [Rounds]
+      summary: Start voting phase
+      operationId: startVoting
+      security:
+        - PlayerTokenHeader: []
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartVotingRequest'
+      responses:
+        '200':
+          description: Voting started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoundStateDto'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Only host can perform this action
+        '404':
+          description: Game not found
+        '409':
+          description: Invalid round state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/games/{gameId}/rounds/votes:
+    post:
+      tags: [Rounds]
+      summary: Cast vote
+      operationId: castVote
+      security:
+        - PlayerTokenHeader: []
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CastVoteRequest'
+      responses:
+        '200':
+          description: Vote accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoundStateDto'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Game not found
+        '409':
+          description: Invalid state or dead player
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/games/{gameId}/rounds/voting/close:
+    post:
+      tags: [Rounds]
+      summary: Close voting and execute target
+      operationId: closeVoting
+      security:
+        - PlayerTokenHeader: []
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      responses:
+        '200':
+          description: Voting closed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VotingResolutionDto'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Only host can perform this action
+        '404':
+          description: Game not found
+        '409':
+          description: Voting timer still active or invalid state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/games/{gameId}/rounds/advance:
+    post:
+      tags: [Rounds]
+      summary: Advance to next round or finish game
+      operationId: advanceRound
+      security:
+        - PlayerTokenHeader: []
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      responses:
+        '200':
+          description: Round advanced or game ended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameAdvanceDto'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Only host can perform this action
+        '404':
+          description: Game not found
+        '409':
+          description: Invalid round state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/games/{gameId}/rounds/hunter-result:
+    get:
+      tags: [Rounds]
+      summary: Get private hunter result for caller
+      operationId: getPrivateHunterResult
+      security:
+        - PlayerTokenHeader: []
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      responses:
+        '200':
+          description: Private hunter result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HunterPrivateResultDto'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Authenticated player is not part of this game
+        '404':
+          description: Game not found
+        '409':
+          description: Invalid round state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /hubs/game:
+    get:
+      tags: [Realtime]
+      summary: SignalR game hub endpoint
+      description: |
+        Connect via SignalR protocol. Useful hub method:
+        `JoinGameChannel(gameId, playerToken)`.
+      responses:
+        '101':
+          description: Switching protocols (WebSocket)
 
 components:
   securitySchemes:
@@ -306,6 +717,22 @@ components:
       scheme: bearer
       bearerFormat: Token
       description: Alternative to X-Player-Token.
+
+  parameters:
+    PlayerIdPath:
+      name: playerId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    GameIdPath:
+      name: gameId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
 
   schemas:
     CreatePlayerRequest:
@@ -387,6 +814,46 @@ components:
           minLength: 4
           maxLength: 64
 
+    AssignRoundQuestionRequest:
+      type: object
+      properties:
+        questionText:
+          type: string
+          maxLength: 200
+          nullable: true
+
+    SubmitRoundActionRequest:
+      type: object
+      required: [selectedPlayerId]
+      properties:
+        selectedPlayerId:
+          type: string
+          format: uuid
+
+    StartDiscussionRequest:
+      type: object
+      properties:
+        durationSeconds:
+          type: integer
+          minimum: 1
+          nullable: true
+
+    StartVotingRequest:
+      type: object
+      properties:
+        durationSeconds:
+          type: integer
+          minimum: 1
+          nullable: true
+
+    CastVoteRequest:
+      type: object
+      required: [targetPlayerId]
+      properties:
+        targetPlayerId:
+          type: string
+          format: uuid
+
     GameListItemDto:
       type: object
       required:
@@ -465,6 +932,160 @@ components:
         isJoinable:
           type: boolean
         passcodeRequired:
+          type: boolean
+
+    GamePlayerStateDto:
+      type: object
+      required: [playerId, name, isAlive, isHost]
+      properties:
+        playerId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        isAlive:
+          type: boolean
+        isHost:
+          type: boolean
+
+    RoundStateDto:
+      type: object
+      required: [roundNumber, phase, serverTimeUtc]
+      properties:
+        roundNumber:
+          type: integer
+        phase:
+          type: string
+        questionText:
+          type: string
+          nullable: true
+        serverTimeUtc:
+          type: string
+          format: date-time
+        questionStartedAtUtc:
+          type: string
+          format: date-time
+          nullable: true
+        discussionStartedAtUtc:
+          type: string
+          format: date-time
+          nullable: true
+        discussionDurationSeconds:
+          type: integer
+          nullable: true
+        discussionEndsAtUtc:
+          type: string
+          format: date-time
+          nullable: true
+        votingStartedAtUtc:
+          type: string
+          format: date-time
+          nullable: true
+        votingDurationSeconds:
+          type: integer
+          nullable: true
+        votingEndsAtUtc:
+          type: string
+          format: date-time
+          nullable: true
+
+    GameStateDto:
+      type: object
+      required:
+        - gameId
+        - name
+        - state
+        - serverTimeUtc
+        - hostPlayerId
+        - currentRoundNumber
+        - discussionTime
+        - votingTime
+        - requestingPlayerId
+        - requestingPlayerRole
+        - requestingPlayerIsAlive
+        - players
+      properties:
+        gameId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        state:
+          type: string
+        serverTimeUtc:
+          type: string
+          format: date-time
+        hostPlayerId:
+          type: string
+          format: uuid
+        currentRoundNumber:
+          type: integer
+        discussionTime:
+          type: integer
+        votingTime:
+          type: integer
+        requestingPlayerId:
+          type: string
+          format: uuid
+        requestingPlayerRole:
+          type: string
+        requestingPlayerIsAlive:
+          type: boolean
+        players:
+          type: array
+          items:
+            $ref: '#/components/schemas/GamePlayerStateDto'
+        currentRound:
+          $ref: '#/components/schemas/RoundStateDto'
+          nullable: true
+
+    NightResolutionDto:
+      type: object
+      required: [roundNumber, phase]
+      properties:
+        roundNumber:
+          type: integer
+        phase:
+          type: string
+        killedPlayerId:
+          type: string
+          format: uuid
+          nullable: true
+
+    VotingResolutionDto:
+      type: object
+      required: [roundNumber, phase]
+      properties:
+        roundNumber:
+          type: integer
+        phase:
+          type: string
+        executedPlayerId:
+          type: string
+          format: uuid
+          nullable: true
+        executedPlayerRole:
+          type: string
+          nullable: true
+
+    GameAdvanceDto:
+      type: object
+      required: [isGameEnded, winner, currentRoundNumber, gameState]
+      properties:
+        isGameEnded:
+          type: boolean
+        winner:
+          type: string
+        currentRoundNumber:
+          type: integer
+        gameState:
+          type: string
+
+    HunterPrivateResultDto:
+      type: object
+      required: [isVampire]
+      properties:
+        isVampire:
           type: boolean
 
     ErrorResponse:

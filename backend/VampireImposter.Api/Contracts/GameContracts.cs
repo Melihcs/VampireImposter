@@ -66,6 +66,14 @@ public sealed class RoundStateDto
     public int RoundNumber { get; set; }
     public string Phase { get; set; } = "";
     public string? QuestionText { get; set; }
+    public DateTimeOffset ServerTimeUtc { get; set; }
+    public DateTimeOffset? QuestionStartedAtUtc { get; set; }
+    public DateTimeOffset? DiscussionStartedAtUtc { get; set; }
+    public int? DiscussionDurationSeconds { get; set; }
+    public DateTimeOffset? DiscussionEndsAtUtc { get; set; }
+    public DateTimeOffset? VotingStartedAtUtc { get; set; }
+    public int? VotingDurationSeconds { get; set; }
+    public DateTimeOffset? VotingEndsAtUtc { get; set; }
 }
 
 public sealed class NightResolutionDto
@@ -73,8 +81,6 @@ public sealed class NightResolutionDto
     public int RoundNumber { get; set; }
     public string Phase { get; set; } = "";
     public Guid? KilledPlayerId { get; set; }
-    public Guid? HunterCheckedPlayerId { get; set; }
-    public bool? HunterDetectedVampire { get; set; }
 }
 
 public sealed class VotingResolutionDto
@@ -96,6 +102,31 @@ public sealed class GameAdvanceDto
 public sealed class HunterPrivateResultDto
 {
     public bool IsVampire { get; set; }
+}
+
+public sealed class GamePlayerStateDto
+{
+    public Guid PlayerId { get; set; }
+    public string Name { get; set; } = "";
+    public bool IsAlive { get; set; }
+    public bool IsHost { get; set; }
+}
+
+public sealed class GameStateDto
+{
+    public Guid GameId { get; set; }
+    public string Name { get; set; } = "";
+    public string State { get; set; } = "Lobby";
+    public DateTimeOffset ServerTimeUtc { get; set; }
+    public Guid HostPlayerId { get; set; }
+    public int CurrentRoundNumber { get; set; }
+    public int DiscussionTime { get; set; }
+    public int VotingTime { get; set; }
+    public Guid RequestingPlayerId { get; set; }
+    public string RequestingPlayerRole { get; set; } = "Unknown";
+    public bool RequestingPlayerIsAlive { get; set; }
+    public GamePlayerStateDto[] Players { get; set; } = Array.Empty<GamePlayerStateDto>();
+    public RoundStateDto? CurrentRound { get; set; }
 }
 
 public sealed class GameListItemDto

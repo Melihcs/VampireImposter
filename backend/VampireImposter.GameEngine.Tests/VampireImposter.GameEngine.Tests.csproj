@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -16,6 +16,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\VampireImposter.GameEngine\VampireImposter.GameEngine.csproj" />
+    <Reference Include="VampireImposter.Api">
+      <HintPath>..\VampireImposter.Api\bin\Debug\net10.0\VampireImposter.Api.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
   </ItemGroup>
 
 </Project>
