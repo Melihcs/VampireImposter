@@ -4,6 +4,7 @@ Monorepo containing:
 
 - ASP.NET Core Web API backend (`backend/VampireImposter.Api`)
 - React + TypeScript + Vite + Tailwind frontend (`frontend`)
+- Angular + TypeScript + Tailwind frontend (`frontend-angular`)
 
 ## Prerequisites
 
@@ -47,6 +48,13 @@ cd frontend
 npm install
 ```
 
+Angular frontend install:
+
+```bash
+cd frontend-angular
+npm install
+```
+
 ## Run
 
 Terminal 1 (backend):
@@ -56,14 +64,21 @@ cd backend/VampireImposter.Api
 dotnet run
 ```
 
-Terminal 2 (frontend):
+Terminal 2 (React frontend):
 
 ```bash
 cd frontend
 npm run dev
 ```
 
-The frontend uses a Vite proxy so `/api` calls go to `https://localhost:5001`.
+Terminal 3 (Angular frontend):
+
+```bash
+cd frontend-angular
+npm run start -- --port 4210 --host 127.0.0.1
+```
+
+Both frontends proxy `/api` to backend HTTP local dev (`http://localhost:5000`).
 
 ## API
 
@@ -86,12 +101,17 @@ dotnet dev-certs https --trust
 
 - Port conflicts:
   - Backend defaults to `https://localhost:5001` and `http://localhost:5000` (see `backend/VampireImposter.Api/Properties/launchSettings.json`).
-  - Frontend defaults to `http://localhost:5173`.
+  - React frontend defaults to `http://localhost:5173`.
+  - Angular frontend defaults to `http://localhost:4200` unless overridden (examples above use `4210`).
 - Tailwind not applying:
   - Ensure `@import "tailwindcss";` is present in `frontend/src/index.css`.
   - Ensure `@tailwindcss/vite` is in `frontend/vite.config.ts` plugins.
   - Ensure `frontend/src/index.css` is imported in `frontend/src/main.tsx`.
+  - For Angular, ensure `frontend-angular/src/styles.css` includes `@import "tailwindcss";`.
+  - For Angular, ensure `frontend-angular/.postcssrc.json` contains `@tailwindcss/postcss`.
   - Restart the Vite dev server after changing config.
-- HTTPS proxy errors:
-  - Confirm the backend is running on `https://localhost:5001`.
-  - If using a different port, update the Vite proxy target in `frontend/vite.config.ts`.
+- Proxy errors:
+  - Confirm the backend is running on `http://localhost:5000`.
+  - If using a different backend port, update:
+    - `frontend/vite.config.ts` (React)
+    - `frontend-angular/proxy.conf.json` (Angular)

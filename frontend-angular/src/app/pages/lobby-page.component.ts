@@ -1,0 +1,227 @@
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
+import { SessionService } from '../core/services/session.service';
+import { AppHeaderComponent } from '../shared/ui/app-header/app-header.component';
+import { BottomSheetComponent } from '../shared/ui/bottom-sheet/bottom-sheet.component';
+import { ButtonComponent } from '../shared/ui/button/button.component';
+import { PhaseIndicatorComponent } from '../shared/ui/phase-indicator/phase-indicator.component';
+import { PlayerChipComponent } from '../shared/ui/player-chip/player-chip.component';
+
+interface LobbyPlayer {
+  name: string;
+  isGM: boolean;
+  isDead: boolean;
+}
+
+@Component({
+  standalone: true,
+  imports: [
+    AppHeaderComponent,
+    BottomSheetComponent,
+    ButtonComponent,
+    PhaseIndicatorComponent,
+    PlayerChipComponent
+  ],
+  template: `
+    <section class="lobby-page">
+      <app-app-header [roomCode]="roomCode()" [isConnected]="true" (leave)="leaveLobby()" />
+
+      <main class="content">
+        <div class="top-row">
+          <app-phase-indicator phase="lobby" />
+          <div class="count-pill">
+            <span>👥</span>
+            <span>{{ players().length }}/12</span>
+          </div>
+        </div>
+
+        <div class="intro">
+          <h2>Waiting for Players</h2>
+          <p>
+            {{
+              isGM
+                ? 'Lock the room when everyone is ready to start'
+                : 'Waiting for game master to start the game'
+            }}
+          </p>
+        </div>
+
+        <div class="players-list">
+          @for (player of players(); track player.name) {
+            <app-player-chip [name]="player.name" [isGM]="player.isGM" [isDead]="player.isDead" />
+          }
+        </div>
+
+        @if (isGM) {
+          <app-button variant="primary" size="lg" [fullWidth]="true" (pressed)="openLockDialog()">
+            <span class="button-content">🔒 Lock Room & Start</span>
+          </app-button>
+        } @else {
+          <div class="waiting-note">
+            Waiting for <span class="host-name">Melih (GM)</span> to start
+          </div>
+        }
+      </main>
+
+      <app-bottom-sheet [isOpen]="showLockConfirm()" title="Lock Room & Start?" (closed)="closeLockDialog()">
+        <div class="sheet-body">
+          <p>
+            Once locked, no new players can join. All current players will be assigned roles and
+            the game will begin.
+          </p>
+
+          <div class="sheet-actions">
+            <app-button variant="secondary" size="md" [fullWidth]="true" (pressed)="closeLockDialog()">
+              Cancel
+            </app-button>
+            <app-button variant="destructive" size="md" [fullWidth]="true" (pressed)="lockAndStart()">
+              Lock & Start
+            </app-button>
+          </div>
+        </div>
+      </app-bottom-sheet>
+    </section>
+  `,
+  styles: `
+    .lobby-page {
+      width: 100%;
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .content {
+      flex: 1;
+      overflow: auto;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.9rem;
+    }
+
+    .top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.7rem;
+    }
+
+    .count-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      border-radius: 999px;
+      border: 1px solid var(--color-border);
+      background: color-mix(in srgb, var(--color-card) 85%, transparent);
+      padding: 0.35rem 0.65rem;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    .intro h2 {
+      margin: 0;
+      font-size: 1.45rem;
+    }
+
+    .intro p {
+      margin: 0.35rem 0 0;
+      font-size: 0.82rem;
+      color: var(--color-muted-foreground);
+      line-height: 1.4;
+    }
+
+    .players-list {
+      display: grid;
+      gap: 0.55rem;
+      flex: 1;
+      align-content: start;
+    }
+
+    .button-content {
+      display: inline-flex;
+      width: 100%;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+    }
+
+    .waiting-note {
+      border: 1px solid var(--color-border);
+      border-radius: 1rem;
+      background: color-mix(in srgb, var(--color-card) 80%, transparent);
+      padding: 0.8rem;
+      text-align: center;
+      color: var(--color-muted-foreground);
+      font-size: 0.82rem;
+    }
+
+    .host-name {
+      color: var(--color-accent);
+      font-weight: 500;
+    }
+
+    .sheet-body {
+      display: grid;
+      gap: 0.9rem;
+    }
+
+    .sheet-body p {
+      margin: 0;
+      color: var(--color-muted-foreground);
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+
+    .sheet-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.6rem;
+    }
+  `
+})
+export class LobbyPageComponent implements OnInit {
+  private readonly router = inject(Router);
+  private readonly session = inject(SessionService);
+
+  readonly players = signal<LobbyPlayer[]>([
+    { name: 'Melih', isGM: true, isDead: false },
+    { name: 'Deniz', isGM: false, isDead: false },
+    { name: 'Eddie', isGM: false, isDead: false },
+    { name: 'Ollie', isGM: false, isDead: false },
+    { name: 'Ege', isGM: false, isDead: false },
+    { name: 'Bilge', isGM: false, isDead: false }
+  ]);
+  readonly showLockConfirm = signal(false);
+  readonly roomCode = computed(() => this.session.gameId() ?? 'K7P4Q');
+
+  readonly isGM = true;
+
+  ngOnInit(): void {
+    if (!this.session.playerName()) {
+      this.router.navigateByUrl('/enter-name');
+      return;
+    }
+
+    if (!this.session.gameId()) {
+      this.session.setGameId('K7P4Q');
+    }
+  }
+
+  leaveLobby(): void {
+    this.session.clearGameContext();
+    this.router.navigateByUrl('/create-or-join');
+  }
+
+  openLockDialog(): void {
+    this.showLockConfirm.set(true);
+  }
+
+  closeLockDialog(): void {
+    this.showLockConfirm.set(false);
+  }
+
+  lockAndStart(): void {
+    this.showLockConfirm.set(false);
+    this.router.navigateByUrl('/role-reveal');
+  }
+}
