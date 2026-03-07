@@ -21,52 +21,7 @@ interface VotingPlayer {
     PlayerChipComponent,
     TimerComponent
   ],
-  template: `
-    <section class="voting-page">
-      <app-app-header roomCode="K7P4Q" [isConnected]="true" (leave)="leaveGame()" />
-
-      <main class="content">
-        <div class="top-row">
-          <app-phase-indicator phase="vote" />
-        </div>
-
-        <div class="intro">
-          <h2>Cast Your Vote</h2>
-          <p>
-            {{
-              hasVoted()
-                ? 'Vote submitted. Waiting for others...'
-                : 'Select a player to execute'
-            }}
-          </p>
-        </div>
-
-        <app-timer [seconds]="timeLeft()" [totalSeconds]="totalTime" label="Voting time" />
-
-        <div class="players">
-          @for (player of players(); track player.name) {
-            <app-player-chip
-              [name]="player.name"
-              variant="voting"
-              [isSelected]="selectedPlayer() === player.name"
-              [clickable]="!hasVoted()"
-              (clicked)="selectPlayer(player.name)"
-            />
-          }
-        </div>
-
-        <app-button
-          variant="primary"
-          size="lg"
-          [fullWidth]="true"
-          [disabled]="!selectedPlayer() || hasVoted()"
-          (pressed)="submitVote()"
-        >
-          {{ hasVoted() ? 'Vote Submitted' : 'Submit Vote' }}
-        </app-button>
-      </main>
-    </section>
-  `,
+  templateUrl: './voting-page.component.html',
   styles: `
     .voting-page {
       width: 100%;

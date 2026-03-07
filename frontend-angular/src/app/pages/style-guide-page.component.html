@@ -1,0 +1,105 @@
+    <section class="style-guide-page">
+      <app-app-header roomCode="GUIDE" [isConnected]="true" />
+
+      <main class="content">
+        <header class="section-intro">
+          <h2>Style Guide</h2>
+          <p>Imposter Room Design System</p>
+        </header>
+
+        <section class="block">
+          <h3>Colors</h3>
+          <div class="color-grid">
+            <article class="swatch">
+              <div class="sample accent"></div>
+              <p>Accent Teal</p>
+              <span>#5BDEEA</span>
+            </article>
+            <article class="swatch">
+              <div class="sample destructive"></div>
+              <p>Destructive</p>
+              <span>#C85D5D</span>
+            </article>
+            <article class="swatch">
+              <div class="sample card"></div>
+              <p>Card</p>
+              <span>#151923</span>
+            </article>
+            <article class="swatch">
+              <div class="sample muted"></div>
+              <p>Muted</p>
+              <span>#2A3040</span>
+            </article>
+          </div>
+        </section>
+
+        <section class="block">
+          <h3>Buttons</h3>
+          <div class="stack">
+            <app-button variant="primary" [fullWidth]="true">Primary Button</app-button>
+            <app-button variant="secondary" [fullWidth]="true">Secondary Button</app-button>
+            <app-button variant="destructive" [fullWidth]="true">Destructive Button</app-button>
+            <app-button variant="primary" [fullWidth]="true" [disabled]="true">Disabled Button</app-button>
+          </div>
+        </section>
+
+        <section class="block">
+          <h3>Player Chips</h3>
+          <div class="stack">
+            <app-player-chip name="Melih" [isGM]="true" />
+            <app-player-chip name="Deniz" [isReady]="true" />
+            <app-player-chip name="Eddie" [isDead]="true" />
+            <app-player-chip name="Ollie" variant="voting" />
+          </div>
+        </section>
+
+        <section class="block">
+          <h3>Phase Indicators</h3>
+          <div class="stack">
+            <app-phase-indicator phase="lobby" />
+            <app-phase-indicator phase="reveal" />
+            <app-phase-indicator phase="day" />
+            <app-phase-indicator phase="vote" />
+            <app-phase-indicator phase="execute" />
+            <app-phase-indicator phase="night" />
+          </div>
+        </section>
+
+        <section class="block">
+          <h3>Timer</h3>
+          <app-timer [seconds]="45" [totalSeconds]="60" label="Time remaining" />
+        </section>
+
+        <section class="block">
+          <h3>Role Cards</h3>
+          <p class="small-copy">
+            All role cards are visually identical except for role text. Privacy blur can be
+            toggled.
+          </p>
+          <div class="role-grid">
+            <div class="role-col">
+              <app-role-card role="villager" [isRevealed]="true" [privacyMode]="false" />
+              <span>Villager</span>
+            </div>
+            <div class="role-col">
+              <app-role-card role="vampire" [isRevealed]="true" [privacyMode]="false" />
+              <span>Vampire</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="block">
+          <h3>Bottom Sheet</h3>
+          <app-button variant="secondary" [fullWidth]="true" (pressed)="openSheet()">
+            Show Bottom Sheet
+          </app-button>
+        </section>
+      </main>
+
+      <app-bottom-sheet [isOpen]="showSheet()" title="Example Bottom Sheet" (closed)="closeSheet()">
+        <p class="sheet-copy">
+          This is an example bottom sheet modal. You can place any content here.
+        </p>
+        <app-button variant="primary" [fullWidth]="true" (pressed)="closeSheet()">Close</app-button>
+      </app-bottom-sheet>
+    </section>

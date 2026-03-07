@@ -14,57 +14,7 @@ interface NightPlayer {
 @Component({
   standalone: true,
   imports: [AppHeaderComponent, ButtonComponent, PhaseIndicatorComponent, PlayerChipComponent],
-  template: `
-    <section class="vampire-page">
-      <app-app-header roomCode="K7P4Q" [isConnected]="true" [showLeave]="false" />
-
-      <main class="content">
-        <div class="top-row">
-          <app-phase-indicator phase="night" />
-        </div>
-
-        <article class="phase-banner">
-          <p class="banner-title">🌙 VAMPIRE PHASE</p>
-          <p class="banner-text">This screen is private. Choose a player to eliminate.</p>
-        </article>
-
-        @if (isVampire) {
-          <div class="selection-flow">
-            <h2>Choose Your Target</h2>
-            <p class="subtitle">Select a player to kill tonight</p>
-
-            <div class="players">
-              @for (player of players(); track player.name) {
-                <app-player-chip
-                  [name]="player.name"
-                  variant="voting"
-                  [isSelected]="selectedTarget() === player.name"
-                  [clickable]="true"
-                  (clicked)="selectTarget(player.name)"
-                />
-              }
-            </div>
-
-            <app-button
-              variant="destructive"
-              size="lg"
-              [fullWidth]="true"
-              [disabled]="!selectedTarget()"
-              (pressed)="confirmKill()"
-            >
-              Confirm Kill
-            </app-button>
-          </div>
-        } @else {
-          <div class="waiting-flow">
-            <div class="moon">🌙</div>
-            <h3>Vampire is Choosing</h3>
-            <p>Wait for the vampire to select their target</p>
-          </div>
-        }
-      </main>
-    </section>
-  `,
+  templateUrl: './night-vampire-kill-page.component.html',
   styles: `
     .vampire-page {
       width: 100%;

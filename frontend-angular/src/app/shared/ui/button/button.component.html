@@ -1,0 +1,9 @@
+    <button
+      class="vi-button"
+      [attr.type]="type"
+      [disabled]="disabled"
+      [ngClass]="buttonClasses"
+      (click)="pressed.emit($event)"
+    >
+      <ng-content />
+    </button>

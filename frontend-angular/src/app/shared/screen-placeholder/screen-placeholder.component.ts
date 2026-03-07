@@ -5,19 +5,7 @@ import { RouterLink } from '@angular/router';
   selector: 'app-screen-placeholder',
   standalone: true,
   imports: [RouterLink],
-  template: `
-    <section class="placeholder-card">
-      <p class="placeholder-route">{{ routePath }}</p>
-      <h2 class="placeholder-title">{{ title }}</h2>
-      <p class="placeholder-description">{{ description }}</p>
-
-      @if (nextRoute) {
-        <a class="placeholder-action" [routerLink]="nextRoute">
-          Continue to {{ nextLabel || nextRoute }}
-        </a>
-      }
-    </section>
-  `,
+  templateUrl: './screen-placeholder.component.html',
   styles: `
     .placeholder-card {
       width: 100%;

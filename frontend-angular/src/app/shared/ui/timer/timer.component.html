@@ -1,0 +1,10 @@
+    <section class="timer-card">
+      <div class="timer-row">
+        <span class="timer-label">{{ label }}</span>
+        <span class="timer-value" [class.low]="isLow">{{ formattedTime }}</span>
+      </div>
+
+      <div class="track">
+        <div class="fill" [class.low]="isLow" [style.width.%]="progress"></div>
+      </div>
+    </section>

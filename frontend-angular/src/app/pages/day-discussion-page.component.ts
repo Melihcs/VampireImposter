@@ -8,46 +8,7 @@ import { TimerComponent } from '../shared/ui/timer/timer.component';
 @Component({
   standalone: true,
   imports: [AppHeaderComponent, ButtonComponent, PhaseIndicatorComponent, TimerComponent],
-  template: `
-    <section class="day-page">
-      <app-app-header roomCode="K7P4Q" [isConnected]="true" (leave)="leaveGame()" />
-
-      <main class="content">
-        <div class="top-row">
-          <app-phase-indicator phase="day" />
-        </div>
-
-        <div class="intro">
-          <h2>Day Discussion</h2>
-          <p>Discuss with others and figure out who the vampire is</p>
-        </div>
-
-        <app-timer [seconds]="timeLeft()" [totalSeconds]="totalTime" />
-
-        <div class="center">
-          <div class="bubble">💬</div>
-
-          <div class="center-copy">
-            <h3>Discuss Freely</h3>
-            <p>
-              Share your suspicions and observations. Work together to identify the vampire before
-              they strike again.
-            </p>
-
-            <div class="tips">
-              <p>• Listen to everyone's perspective</p>
-              <p>• Look for suspicious behavior</p>
-              <p>• The Hunter can share their findings</p>
-            </div>
-          </div>
-        </div>
-
-        <app-button variant="primary" size="lg" [fullWidth]="true" (pressed)="goToVoting()">
-          Skip to Voting
-        </app-button>
-      </main>
-    </section>
-  `,
+  templateUrl: './day-discussion-page.component.html',
   styles: `
     .day-page {
       width: 100%;

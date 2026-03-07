@@ -6,32 +6,7 @@ import { ButtonComponent } from '../shared/ui/button/button.component';
 @Component({
   standalone: true,
   imports: [ButtonComponent],
-  template: `
-    <section class="choice-page">
-      <div class="content">
-        <div class="intro">
-          <div class="moon-badge">🌙</div>
-          <h2>Imposter Room</h2>
-          <p>Create a new game or join existing</p>
-          @if (playerName()) {
-            <p class="welcome">Playing as {{ playerName() }}</p>
-          }
-        </div>
-
-        <div class="actions">
-          <app-button variant="primary" size="lg" [fullWidth]="true" (pressed)="goToCreateRoom()">
-            <span class="button-content">＋ Create New Room</span>
-          </app-button>
-
-          <app-button variant="secondary" size="lg" [fullWidth]="true" (pressed)="goToJoinRoom()">
-            <span class="button-content">↪ Join Existing Room</span>
-          </app-button>
-        </div>
-      </div>
-
-      <p class="footer-note">A realtime social deduction game</p>
-    </section>
-  `,
+  templateUrl: './create-or-join-page.component.html',
   styles: `
     .choice-page {
       width: 100%;

@@ -8,17 +8,7 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
   selector: 'app-button',
   standalone: true,
   imports: [NgClass],
-  template: `
-    <button
-      class="vi-button"
-      [attr.type]="type"
-      [disabled]="disabled"
-      [ngClass]="buttonClasses"
-      (click)="pressed.emit($event)"
-    >
-      <ng-content />
-    </button>
-  `,
+  templateUrl: './button.component.html',
   styles: `
     .vi-button {
       border-radius: 1rem;

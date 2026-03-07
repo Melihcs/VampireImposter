@@ -3,21 +3,7 @@ import { Router } from '@angular/router';
 
 @Component({
   standalone: true,
-  template: `
-    <section class="splash-page">
-      <div class="splash-content">
-        <div class="orb-wrapper">
-          <div class="orb"></div>
-          <div class="orb-glow"></div>
-        </div>
-
-        <h2 class="title">Imposter Room</h2>
-        <p class="subtitle">Social Deduction Game</p>
-
-        <p class="loading">Loading...</p>
-      </div>
-    </section>
-  `,
+  templateUrl: './splash-page.component.html',
   styles: `
     .splash-page {
       width: 100%;

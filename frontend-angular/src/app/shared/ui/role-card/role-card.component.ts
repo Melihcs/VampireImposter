@@ -20,34 +20,7 @@ const ROLE_META: Record<Role, { name: string; instruction: string }> = {
 @Component({
   selector: 'app-role-card',
   standalone: true,
-  template: `
-    <button class="role-card" type="button" (click)="onCardClick()">
-      @if (!isRevealed) {
-        <div class="face">
-          <p class="face-title">Tap to Reveal</p>
-          <p class="face-subtitle">Private role card</p>
-        </div>
-      } @else {
-        <div class="face revealed">
-          <h3 class="role-name" [style.filter]="nameFilter">{{ roleMeta.name }}</h3>
-          <p class="role-text" [style.filter]="instructionFilter">{{ roleMeta.instruction }}</p>
-
-          @if (privacyMode) {
-            <span
-              class="hold-chip"
-              (mousedown)="setUnblurred(true)"
-              (mouseup)="setUnblurred(false)"
-              (mouseleave)="setUnblurred(false)"
-              (touchstart)="setUnblurred(true)"
-              (touchend)="setUnblurred(false)"
-            >
-              {{ isUnblurred() ? 'Release to hide' : 'Hold to read' }}
-            </span>
-          }
-        </div>
-      }
-    </button>
-  `,
+  templateUrl: './role-card.component.html',
   styles: `
     .role-card {
       width: min(100%, 280px);

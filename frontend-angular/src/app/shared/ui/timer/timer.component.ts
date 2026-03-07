@@ -3,18 +3,7 @@ import { Component, Input } from '@angular/core';
 @Component({
   selector: 'app-timer',
   standalone: true,
-  template: `
-    <section class="timer-card">
-      <div class="timer-row">
-        <span class="timer-label">{{ label }}</span>
-        <span class="timer-value" [class.low]="isLow">{{ formattedTime }}</span>
-      </div>
-
-      <div class="track">
-        <div class="fill" [class.low]="isLow" [style.width.%]="progress"></div>
-      </div>
-    </section>
-  `,
+  templateUrl: './timer.component.html',
   styles: `
     .timer-card {
       border: 1px solid var(--color-border);

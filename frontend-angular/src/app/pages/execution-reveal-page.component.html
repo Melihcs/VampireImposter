@@ -1,0 +1,37 @@
+    <section class="execution-page">
+      <app-app-header roomCode="K7P4Q" [isConnected]="true" [showLeave]="false" />
+
+      <main class="content">
+        <div class="top-row">
+          <app-phase-indicator phase="execute" />
+        </div>
+
+        <div class="center">
+          <div class="skull">☠</div>
+
+          <h2>{{ executedPlayer }}</h2>
+          <p class="executed-text">has been executed</p>
+
+          @if (isRevealed()) {
+            <article class="reveal-card">
+              <p class="reveal-label">Their role was</p>
+              <p class="reveal-role">{{ revealedRole }}</p>
+            </article>
+          }
+
+          <article class="note">
+            Role reveals use identical styling for all roles to prevent accidental spoilers
+          </article>
+        </div>
+
+        @if (isGM) {
+          <app-button variant="primary" size="lg" [fullWidth]="true" (pressed)="goToNightPhase()">
+            Continue to Night Phase
+          </app-button>
+        } @else {
+          <div class="waiting-note">
+            Waiting for <span>Melih (GM)</span>
+          </div>
+        }
+      </main>
+    </section>

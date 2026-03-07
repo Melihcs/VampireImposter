@@ -22,66 +22,7 @@ interface LobbyPlayer {
     PhaseIndicatorComponent,
     PlayerChipComponent
   ],
-  template: `
-    <section class="lobby-page">
-      <app-app-header [roomCode]="roomCode()" [isConnected]="true" (leave)="leaveLobby()" />
-
-      <main class="content">
-        <div class="top-row">
-          <app-phase-indicator phase="lobby" />
-          <div class="count-pill">
-            <span>👥</span>
-            <span>{{ players().length }}/12</span>
-          </div>
-        </div>
-
-        <div class="intro">
-          <h2>Waiting for Players</h2>
-          <p>
-            {{
-              isGM
-                ? 'Lock the room when everyone is ready to start'
-                : 'Waiting for game master to start the game'
-            }}
-          </p>
-        </div>
-
-        <div class="players-list">
-          @for (player of players(); track player.name) {
-            <app-player-chip [name]="player.name" [isGM]="player.isGM" [isDead]="player.isDead" />
-          }
-        </div>
-
-        @if (isGM) {
-          <app-button variant="primary" size="lg" [fullWidth]="true" (pressed)="openLockDialog()">
-            <span class="button-content">🔒 Lock Room & Start</span>
-          </app-button>
-        } @else {
-          <div class="waiting-note">
-            Waiting for <span class="host-name">Melih (GM)</span> to start
-          </div>
-        }
-      </main>
-
-      <app-bottom-sheet [isOpen]="showLockConfirm()" title="Lock Room & Start?" (closed)="closeLockDialog()">
-        <div class="sheet-body">
-          <p>
-            Once locked, no new players can join. All current players will be assigned roles and
-            the game will begin.
-          </p>
-
-          <div class="sheet-actions">
-            <app-button variant="secondary" size="md" [fullWidth]="true" (pressed)="closeLockDialog()">
-              Cancel
-            </app-button>
-            <app-button variant="destructive" size="md" [fullWidth]="true" (pressed)="lockAndStart()">
-              Lock & Start
-            </app-button>
-          </div>
-        </div>
-      </app-bottom-sheet>
-    </section>
-  `,
+  templateUrl: './lobby-page.component.html',
   styles: `
     .lobby-page {
       width: 100%;

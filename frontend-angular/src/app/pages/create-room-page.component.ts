@@ -6,77 +6,7 @@ import { ButtonComponent } from '../shared/ui/button/button.component';
 @Component({
   standalone: true,
   imports: [ButtonComponent],
-  template: `
-    <section class="create-room-page">
-      <header class="page-header">
-        <div class="header-icon">⚙</div>
-        <div>
-          <h2>Create Room</h2>
-          <p>Configure game settings</p>
-        </div>
-      </header>
-
-      <main class="content">
-        <article class="card">
-          <div class="card-top">
-            <span class="clock">⏱</span>
-            <div>
-              <h3>Discussion Time</h3>
-              <p>How long players can discuss during day phase</p>
-            </div>
-          </div>
-          <div class="range-row">
-            <input
-              type="range"
-              min="30"
-              max="300"
-              step="30"
-              [value]="discussionTime()"
-              (input)="onDiscussionChange($event)"
-            />
-            <span class="value">{{ formatSeconds(discussionTime()) }}</span>
-          </div>
-        </article>
-
-        <article class="card">
-          <div class="card-top">
-            <span class="clock">⏱</span>
-            <div>
-              <h3>Voting Time</h3>
-              <p>Time limit for casting votes</p>
-            </div>
-          </div>
-          <div class="range-row">
-            <input
-              type="range"
-              min="30"
-              max="120"
-              step="15"
-              [value]="votingTime()"
-              (input)="onVotingChange($event)"
-            />
-            <span class="value">{{ formatSeconds(votingTime()) }}</span>
-          </div>
-        </article>
-
-        <article class="card">
-          <label class="check-row">
-            <input type="checkbox" [checked]="allowRejoin()" (change)="onRejoinChange($event)" />
-            <div>
-              <h3>Allow Rejoin After Lock</h3>
-              <p>Players can reconnect after room is locked</p>
-            </div>
-          </label>
-        </article>
-      </main>
-
-      <footer class="footer">
-        <app-button variant="primary" size="lg" [fullWidth]="true" (pressed)="createRoom()">
-          Create Room
-        </app-button>
-      </footer>
-    </section>
-  `,
+  templateUrl: './create-room-page.component.html',
   styles: `
     .create-room-page {
       width: 100%;

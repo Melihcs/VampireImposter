@@ -6,46 +6,7 @@ import { ButtonComponent } from '../shared/ui/button/button.component';
 @Component({
   standalone: true,
   imports: [ButtonComponent],
-  template: `
-    <section class="join-room-page">
-      <div class="content">
-        <div class="intro">
-          <div class="badge">↪</div>
-          <h2>Join Room</h2>
-          <p>Enter the 5-character room code</p>
-        </div>
-
-        <div class="form">
-          <label for="roomCode">Room Code</label>
-          <input
-            id="roomCode"
-            type="text"
-            [value]="roomCode()"
-            (input)="onRoomCodeInput($event)"
-            (keydown.enter)="joinRoom()"
-            placeholder="K7P4Q"
-            maxlength="5"
-            autocomplete="off"
-            [class.input-error]="error().length > 0"
-          />
-
-          @if (error()) {
-            <p class="error">{{ error() }}</p>
-          }
-
-          <app-button
-            variant="primary"
-            size="lg"
-            [fullWidth]="true"
-            [disabled]="roomCode().length !== 5"
-            (pressed)="joinRoom()"
-          >
-            Join Room
-          </app-button>
-        </div>
-      </div>
-    </section>
-  `,
+  templateUrl: './join-room-page.component.html',
   styles: `
     .join-room-page {
       width: 100%;

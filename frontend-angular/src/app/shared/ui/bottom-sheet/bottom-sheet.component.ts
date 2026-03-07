@@ -3,24 +3,7 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 @Component({
   selector: 'app-bottom-sheet',
   standalone: true,
-  template: `
-    @if (isOpen) {
-      <div class="backdrop" (click)="closed.emit()"></div>
-      <section class="sheet" (click)="$event.stopPropagation()">
-        <div class="handle" aria-hidden="true"></div>
-        @if (title) {
-          <div class="sheet-header">
-            <h3>{{ title }}</h3>
-            <button type="button" (click)="closed.emit()">Close</button>
-          </div>
-        }
-
-        <div class="sheet-content">
-          <ng-content />
-        </div>
-      </section>
-    }
-  `,
+  templateUrl: './bottom-sheet.component.html',
   styles: `
     .backdrop {
       position: fixed;

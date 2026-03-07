@@ -14,34 +14,7 @@ interface ReadyPlayer {
 @Component({
   standalone: true,
   imports: [AppHeaderComponent, PhaseIndicatorComponent, PlayerChipComponent],
-  template: `
-    <section class="waiting-page">
-      <app-app-header roomCode="K7P4Q" [isConnected]="true" [showLeave]="false" />
-
-      <main class="content">
-        <div class="top-row">
-          <app-phase-indicator phase="reveal" />
-        </div>
-
-        <div class="intro">
-          <div class="hourglass">⏳</div>
-          <h2>Waiting for Others</h2>
-          <p>Game will start when everyone has seen their role</p>
-        </div>
-
-        <div class="players-list">
-          @for (player of players(); track player.name) {
-            <app-player-chip
-              [name]="player.name"
-              [isGM]="player.isGM"
-              [isDead]="player.isDead"
-              [isReady]="player.isReady"
-            />
-          }
-        </div>
-      </main>
-    </section>
-  `,
+  templateUrl: './waiting-for-others-page.component.html',
   styles: `
     .waiting-page {
       width: 100%;

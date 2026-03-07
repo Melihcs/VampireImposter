@@ -1,0 +1,47 @@
+    <section class="game-over-page">
+      <app-app-header roomCode="K7P4Q" [isConnected]="true" [showLeave]="false" />
+
+      <main class="content">
+        <div class="hero">
+          <div class="trophy">🏆</div>
+          <h2>Game Over</h2>
+          <p class="winner">{{ winner }} Win!</p>
+        </div>
+
+        <section class="roster">
+          <h3>Final Roles</h3>
+
+          <div class="roster-list">
+            @for (player of finalRoster; track player.name) {
+              <article class="roster-item">
+                <div class="left">
+                  <div class="avatar" [class.dead]="player.isDead">
+                    {{ player.name.slice(0, 2).toUpperCase() }}
+                  </div>
+                  <div>
+                    <p class="name" [class.dead]="player.isDead">{{ player.name }}</p>
+                    <p class="role">{{ player.role }}</p>
+                  </div>
+                </div>
+                <span class="state" [class.dead]="player.isDead">
+                  {{ player.isDead ? 'Dead' : 'Alive' }}
+                </span>
+              </article>
+            }
+          </div>
+        </section>
+
+        <article class="summary">
+          The vampire was eliminated! The village is safe once more.
+        </article>
+
+        <div class="actions">
+          <app-button variant="primary" size="lg" [fullWidth]="true" (pressed)="playAgain()">
+            Play Again
+          </app-button>
+          <app-button variant="secondary" size="lg" [fullWidth]="true" (pressed)="leaveRoom()">
+            Leave Room
+          </app-button>
+        </div>
+      </main>
+    </section>

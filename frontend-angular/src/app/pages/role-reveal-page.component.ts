@@ -8,64 +8,7 @@ import { Role, RoleCardComponent } from '../shared/ui/role-card/role-card.compon
 @Component({
   standalone: true,
   imports: [AppHeaderComponent, ButtonComponent, PhaseIndicatorComponent, RoleCardComponent],
-  template: `
-    <section class="role-reveal-page">
-      <app-app-header roomCode="K7P4Q" [isConnected]="true" [showLeave]="false" />
-
-      <main class="content">
-        <div class="top-row">
-          <app-phase-indicator phase="reveal" />
-        </div>
-
-        <div class="center-content">
-          <div class="intro">
-            <h2>Your Role</h2>
-            <p>
-              {{
-                isRevealed()
-                  ? 'Remember your role and mission'
-                  : 'Tap the card to reveal your role'
-              }}
-            </p>
-          </div>
-
-          <app-role-card
-            [role]="role()"
-            [isRevealed]="isRevealed()"
-            [privacyMode]="privacyMode()"
-            (reveal)="handleReveal()"
-          />
-
-          <label class="privacy-toggle">
-            <input type="checkbox" [checked]="privacyMode()" (change)="onPrivacyToggle($event)" />
-            <div class="privacy-text">
-              <p class="privacy-title">{{ privacyMode() ? '👁 Anti-peek Blur' : '🙈 Blur Off' }}</p>
-              <p class="privacy-subtitle">Hold to read role when blur is active</p>
-            </div>
-          </label>
-        </div>
-
-        <div class="bottom-actions">
-          <p class="tip">
-            <span>Privacy tip:</span> Shield your screen from others.
-            @if (privacyMode()) {
-              <span> Hold the blurred text to read clearly.</span>
-            }
-          </p>
-
-          <app-button
-            variant="primary"
-            size="lg"
-            [fullWidth]="true"
-            [disabled]="!hasRevealed()"
-            (pressed)="confirmRoleSeen()"
-          >
-            I Saw My Role
-          </app-button>
-        </div>
-      </main>
-    </section>
-  `,
+  templateUrl: './role-reveal-page.component.html',
   styles: `
     .role-reveal-page {
       width: 100%;

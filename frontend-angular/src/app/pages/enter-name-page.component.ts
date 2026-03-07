@@ -6,41 +6,7 @@ import { ButtonComponent } from '../shared/ui/button/button.component';
 @Component({
   standalone: true,
   imports: [ButtonComponent],
-  template: `
-    <section class="enter-name-page">
-      <div class="content">
-        <div class="intro">
-          <div class="avatar-badge">👤</div>
-          <h2>Welcome</h2>
-          <p>Enter your name to begin</p>
-        </div>
-
-        <div class="form">
-          <label for="name">Your Name</label>
-          <input
-            id="name"
-            type="text"
-            [value]="name()"
-            (input)="onNameInput($event)"
-            (keydown.enter)="continue()"
-            placeholder="Enter your name..."
-            maxlength="20"
-            autofocus
-          />
-
-          <app-button
-            variant="primary"
-            size="lg"
-            [fullWidth]="true"
-            [disabled]="!hasName()"
-            (pressed)="continue()"
-          >
-            Continue
-          </app-button>
-        </div>
-      </div>
-    </section>
-  `,
+  templateUrl: './enter-name-page.component.html',
   styles: `
     .enter-name-page {
       width: 100%;

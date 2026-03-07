@@ -14,12 +14,7 @@ const PHASE_META: Record<GamePhase, { icon: string; label: string; color: string
 @Component({
   selector: 'app-phase-indicator',
   standalone: true,
-  template: `
-    <div class="phase-pill">
-      <span class="phase-icon" [style.color]="meta.color" aria-hidden="true">{{ meta.icon }}</span>
-      <span class="phase-label">{{ meta.label }}</span>
-    </div>
-  `,
+  templateUrl: './phase-indicator.component.html',
   styles: `
     .phase-pill {
       display: inline-flex;

@@ -7,48 +7,7 @@ type LoadState = 'loading' | 'ready' | 'error';
 
 @Component({
   standalone: true,
-  template: `
-    <section class="roster-page">
-      <header class="roster-header">
-        <div>
-          <h2>Vampire Imposter</h2>
-          <p>Suspects and survivors</p>
-        </div>
-        <span class="badge">Live Roster</span>
-      </header>
-
-      <main class="roster-content">
-        @if (state() === 'loading') {
-          <div class="state-card state-card-loading">
-            <p class="state-title">Loading players...</p>
-            <div class="loading-bar"></div>
-          </div>
-        }
-
-        @if (state() === 'error') {
-          <div class="state-card state-card-error">
-            <p class="state-title">Unable to load players</p>
-            <p class="state-error-message">{{ error() }}</p>
-            <button type="button" class="retry-btn" (click)="loadPlayers()">Retry</button>
-          </div>
-        }
-
-        @if (state() === 'ready') {
-          <div class="players-grid">
-            @for (player of players(); track player.id) {
-              <article class="player-card">
-                <div class="player-row">
-                  <p class="player-name">{{ player.name }}</p>
-                  <span class="player-id">#{{ player.id }}</span>
-                </div>
-                <p class="player-position">{{ player.position }}</p>
-              </article>
-            }
-          </div>
-        }
-      </main>
-    </section>
-  `,
+  templateUrl: './roster-page.component.html',
   styles: `
     .roster-page {
       width: 100%;

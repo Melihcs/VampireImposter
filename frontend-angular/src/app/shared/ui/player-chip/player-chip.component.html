@@ -1,0 +1,25 @@
+    <div class="chip" [ngClass]="chipClasses" (click)="clicked.emit()">
+      <div class="avatar" [ngClass]="{ dead: isDead, large: variant === 'voting' }">
+        @if (isDead) {
+          <span aria-hidden="true">☠</span>
+        } @else {
+          <span>{{ initials }}</span>
+        }
+      </div>
+
+      <div class="details">
+        <div class="name-row">
+          <span class="name" [ngClass]="{ dead: isDead }">{{ name }}</span>
+          @if (isGM) {
+            <span class="gm-pill">GM</span>
+          }
+        </div>
+
+        <p class="status">
+          {{ isDead ? 'Dead' : 'Alive' }}
+          @if (isReady) {
+            <span> • Ready</span>
+          }
+        </p>
+      </div>
+    </div>
